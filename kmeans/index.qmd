@@ -1,0 +1,55 @@
+
+---
+title: "K-means Clustering Algorithm"
+format: 
+    html:
+        embed-resources: true
+        fontsize: 1.1em
+        linestretch: 1.7
+author: "Guangchuang Yu\\
+
+        School of Basic Medical Sciences, Southern Medical University"
+date: "`r Sys.Date()`"
+---
+
+## 算法步骤
+
+1. 选择聚类数 𝑘
+2. 随机选择 k 个初始中心
+3. 将每个样本分配到最近的中心
+4. 更新中心点（取各簇均值）
+5. 重复直到收敛
+
+
+
+```{r}
+# 示例数据
+set.seed(123)
+data <- iris[, -5]  # 去掉标签列
+
+## k-means聚类
+km_res <- kmeans(data, centers = 3, nstart = 25)
+
+## 查看结果
+print(km_res)
+table(iris$Species, km_res$cluster)
+
+## 可视化
+library(ggplot2)
+data$cluster <- as.factor(km_res$cluster)
+ggplot(data, aes(x = Sepal.Length, y = Sepal.Width, color = cluster)) +
+  geom_point(size = 3) +
+  theme_minimal()
+
+## k值选择（肘部法则）
+wss <- sapply(1:10, function(k){
+  kmeans(data, centers = k, nstart = 10)$tot.withinss
+})
+plot(1:10, wss, type="b", pch=19, frame=FALSE,
+     xlab="Number of clusters K",
+     ylab="Total within-clusters sum of squares")
+```
+
+## 交互动画
+
+- [kmeans_animation](kmeans_animation.html)
