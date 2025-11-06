@@ -1,0 +1,161 @@
+
+---
+title: "蛋白结构预测"
+format: 
+    html:
+        embed-resources: true
+        fontsize: 1.1em
+        linestretch: 1.7
+author: "Guangchuang Yu\\
+
+        School of Basic Medical Sciences, Southern Medical University"
+date: "`r Sys.Date()`"
+---
+
+## 实验目的
+
+掌握使用工具对目标蛋白质进行同源建模
+
+## 实验内容
+
+1. 下载建模目标序列
+2. 使用SWISS-MODEL进行同源建模
+3. 查看比较模型
+
+实验基于R语言环境，需安装R语言，可从以下链接下载：
+
+- Windows版本：<https://mirrors.hust.edu.cn/CRAN/bin/windows/base/R-4.5.2-win.exe>
+- Mac版本：<https://mirrors.hust.edu.cn/CRAN/bin/macosx/big-sur-arm64/base/R-4.5.2-arm64.pkg>
+- Mac（Intel芯片）：<https://mirrors.hust.edu.cn/CRAN/bin/macosx/big-sur-x86_64/base/R-4.5.2-x86_64.pkg>
+
+可以使用RStudio集成环境，获得更好的使用体验：
+
+- <https://posit.co/download/rstudio-desktop/>
+
+设置R包镜像，以便快速安装R包。推荐使用华中科大镜像：
+
+```{r eval= FALSE}
+options(repos = c(CRAN = "https://mirrors.hust.edu.cn/CRAN/"))
+```
+
+安装并加载R包`yulab.utils`，它提供了`pload()`函数，可以方便后续加载R包。
+
+`pload()`的逻辑是：
+
+- 如R包已安装，直接加载
+- 如R包未安装，则先（询问）安装再加载
+
+```{r echo= FALSE}
+library(yulab.utils)
+```
+
+```{r eval= FALSE}
+install.packages('yulab.utils')
+library(yulab.utils)
+```
+
+
+## 目标序列
+
+DMWf18-543和DMWf18-558为两个深海来源的同源脂类水解酶。序列一致性达80.7%，然而底物特异性和偏好性有显著差异。从三维结构探究底物特异性和偏好性机制。
+
+- DMWf18-558能够水解链长范围较广的脂类底物
+- DMWf18-543仅能水解短链脂类底物
+
+### 下载目标序列
+
+- DMWf18-543登录号为AUF80930
+- DMWf18-558登录号为AUF80945
+
+方法一：登录NCBI protein数据库，下载相应的氨基酸序列。
+
+- <https://www.ncbi.nlm.nih.gov/protein/AUF80930>
+- <https://www.ncbi.nlm.nih.gov/protein/AUF80945>
+
+方法二：使用`rentrez`包下载序列。
+
+
+```{r}
+pload(rentrez)
+x <- entrez_fetch(db='protein', id=c('AUF80930', 'AUF80945'), rettype='fasta')
+cat(x)
+```
+
+- [AUF80930.fasta](AUF80930.fasta)
+- [AUF80945.fasta](AUF80945.fasta)
+
+## 使用SWISS-MODEL进行同源建模
+
+SWISS-MODEL在线同源建模服务器：<https://swissmodel.expasy.org/interactive>，上传序列进行同源建模，下载建模结果：
+
+- [AUF80930.pdb](AUF80930.pdb)
+- [AUF80945.pdb](AUF80945.pdb)
+
+## 查看比较模型
+
+使用`r3dmol`包查看比较两个模型结构。
+
+```{r}
+pload(r3dmol)
+pload(shiny)
+
+auf80930 <- readLines("AUF80930.pdb")
+auf80945 <- readLines("AUF80945.pdb")
+
+
+r3dmol() |>
+    m_add_model(data = auf80945, format = 'pdb') |>
+    m_zoom_to() |>
+    m_set_style(style = m_style_cartoon(color = 'spectrum')) |>
+    m_add_style(
+        style = m_style_stick(),
+        sel = m_sel(resi = c(144, 238, 269), chain = 'A')
+    )
+
+
+r3dmol() |>
+    m_add_model(data = auf80930, format = 'pdb') |>
+    m_zoom_to() |>
+    m_set_style(style = m_style_cartoon(color = 'spectrum')) |>
+    m_add_style(
+        style = m_style_stick(),
+        sel = m_sel(resi = c(144, 238, 269), chain = 'A')
+    ) |>
+    m_add_style(
+        style = m_style_sphere(),
+        sel = m_sel(resi = 199, chain = 'A')
+    ) |>
+    m_add_label(text = "Ser144", sel = m_sel(resi = 144)) |>
+    m_add_label(text = "Glu238", sel = m_sel(resi = 238)) |>
+    m_add_label(text = "His269", sel = m_sel(resi = 269)) |>
+    m_add_label(text = "Leu199", sel = m_sel(resi = 199)) |>
+    m_add_surface(style = m_style_surface(opacity = 0.4)) |>
+    m_zoom_to() |>
+    m_spin()
+
+
+r3dmol() |>
+    m_add_model(data = auf80945, format = 'pdb') |>
+    m_zoom_to() |>
+    m_set_style(style = m_style_cartoon(color = 'spectrum')) |>
+    m_add_style(
+        style = m_style_stick(),
+        sel = m_sel(resi = c(144, 238, 269), chain = 'A')
+    ) |>
+    m_add_style(
+        style = m_style_sphere(),
+        sel = m_sel(resi = 199, chain = 'A')
+    ) |>
+    m_add_label(text = "Ser144", sel = m_sel(resi = 144)) |>
+    m_add_label(text = "Glu238", sel = m_sel(resi = 238)) |>
+    m_add_label(text = "His269", sel = m_sel(resi = 269)) |>
+    m_add_label(text = "Leu199", sel = m_sel(resi = 199)) |>
+    m_add_surface(style = m_style_surface(opacity = 0.4)) |>
+    m_zoom_to()
+```
+
+
+## 参考资料
+
++ [Protein structure homology modeling using SWISS-MODEL workspace](https://www.nature.com/articles/nprot.2008.197)
++ [在R中对分子结构进行3D可视化](https://mp.weixin.qq.com/s/lOfc6ZRFBI3EWoSgpd5guw)
