@@ -86,10 +86,24 @@ cat(x)
 
 ## 使用SWISS-MODEL进行同源建模
 
+### 方法一：使用在线服务器
+
 SWISS-MODEL在线同源建模服务器：<https://swissmodel.expasy.org/interactive>，上传序列进行同源建模，下载建模结果：
 
 - [AUF80930.pdb](AUF80930.pdb)
 - [AUF80945.pdb](AUF80945.pdb)
+
+### 方法二：使用R包`swissmodel`
+
+R包`swissmodel`提供了调用SWISS-MODEL在线服务器进行同源建模的功能。
+
+- <https://github.com/YuLab-SMU/swissmodel>
+
+
+使用方法，参考这篇文章：
+
+- [为了上课，给Swiss-Model写个R包吧](https://mp.weixin.qq.com/s/k_JZ7YPcY2fAqf4CyucX7w?scene=1&click_id=29)
+
 
 ## 查看比较模型
 
@@ -157,5 +171,7 @@ r3dmol() |>
 
 ## 参考资料
 
++ [Swiss Model帮助文档](https://swissmodel.expasy.org/docs/help)
 + [Protein structure homology modeling using SWISS-MODEL workspace](https://www.nature.com/articles/nprot.2008.197)
++ [为了上课，给Swiss-Model写个R包吧](https://mp.weixin.qq.com/s/k_JZ7YPcY2fAqf4CyucX7w?scene=1&click_id=29)
 + [在R中对分子结构进行3D可视化](https://mp.weixin.qq.com/s/lOfc6ZRFBI3EWoSgpd5guw)
