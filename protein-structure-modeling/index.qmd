@@ -26,21 +26,6 @@ date: "`r Sys.Date()`"
 
 - [R语言安装](../rlang/index.html)
 
-安装并加载R包`yulab.utils`，它提供了`pload()`函数，可以方便后续加载R包。
-
-`pload()`的逻辑是：
-
-- 如R包已安装，直接加载
-- 如R包未安装，则先（询问）安装再加载
-
-```{r echo= FALSE}
-library(yulab.utils)
-```
-
-```{r eval= FALSE}
-install.packages('yulab.utils')
-library(yulab.utils)
-```
 
 
 ## 目标序列
@@ -64,6 +49,8 @@ DMWf18-543和DMWf18-558为两个深海来源的同源脂类水解酶。序列一
 
 
 ```{r}
+library(yulab.utils)
+
 pload(rentrez)
 x <- entrez_fetch(db='protein', id=c('AUF80930', 'AUF80945'), rettype='fasta')
 cat(x)

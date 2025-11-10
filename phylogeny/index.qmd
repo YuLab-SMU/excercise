@@ -1,0 +1,121 @@
+
+---
+title: "多序列比对与系统发育分析"
+format: 
+    html:
+        embed-resources: true
+        fontsize: 1.1em
+        linestretch: 1.7
+author: "Guangchuang Yu\\
+
+        School of Basic Medical Sciences, Southern Medical University"
+date: "`r Sys.Date()`"
+---
+
+实验基于R语言环境，安装R语言，可参考：
+
+- [R语言安装](../rlang/index.html)
+
+
+```{r echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+library(muscle)
+library(ape)
+library(ggtree)
+library(tidytree)
+library(treeio)
+library(seqmagick)
+```
+
+
+## 下载序列
+
+### Sylvia属鸟类线粒体cytb基因accession number
+```{r}
+x <- paste("AJ5345", 26:49, sep = "")
+x
+```
+
+### 使用rentrez包下载fasta格式的序列
+```{r}
+library(yulab.utils)
+pload(rentrez)
+
+raw_recs <- entrez_fetch(db = 'nuccore', id = x, rettype = 'fasta')
+
+cytb_file <- "sylvia_cytb.fasta"
+cat(raw_recs, file = cytb_file)
+```
+
+## 多序列比对
+
+### 读取序列
+
+```{r}
+pload(seqmagick)
+
+cybt <- fa_read(cytb_file)
+cybt
+```
+
+### 序列比对
+
+```{r}
+pload(muscle)
+
+cybt_aln <- bs_aln(cybt)
+cybt_aln
+
+# 保存比对结果
+aln_file <- "sylvia_cytb_aln.fasta"
+fa_write(cybt_aln, outfile = aln_file)
+```
+
+## 构建进化树
+
+NJ方法构建系统发育树，如果要使用ML方法，可以参考[这里](https://cran.r-project.org/web/packages/phangorn/vignettes/Trees.html)
+
+```{r}
+pload(ape)
+sylvia_aln <- read.dna(aln_file, format = 'fasta')
+
+tree <- bionj(dist.dna(sylvia_aln, model = "K80"))
+tree
+```
+
+
+## 进化树可视化
+
+### 简单树可视化
+```{r}
+pload(ggtree)
+ggtree(tree) + geom_tiplab() + hexpand(2)
+```
+
+### 添加bootstrap值
+
+```{r}
+bp <- boot.phylo(tree, sylvia_aln, function(x) bionj(dist.dna(x)))
+bp
+
+pload(tidytree)
+pload(treeio)
+bp2 <- tibble(node = 1:Nnode(tree) + Ntip(tree), bootstrap = bp)
+tree2 <- full_join(tree, bp2, by = "node")
+tree2
+```
+
+### 可视化带bootstrap值的进化树
+
+```{r}
+pload(ggplot2)
+pload(ggtree)
+
+ggtree(tree2) +
+    geom_tiplab(aes(
+        label = sub("\\S+\\s+(\\w+)\\s+(\\w+)\\s.*$", "\\1 \\2", label)
+    )) +
+    hexpand(.1) +
+    geom_nodepoint(aes(color = bootstrap), size = 4) +
+    scale_color_viridis_c() +
+    theme(legend.position = c(.9, .8))
+```

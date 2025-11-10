@@ -29,3 +29,13 @@ date: "`r Sys.Date()`"
 options(repos = c(CRAN = "https://mirrors.hust.edu.cn/CRAN/"))
 ```
 
+安装R包`yulab.utils`，它提供了`pload()`函数，可以方便后续（安装）加载R包。
+
+`pload()`的逻辑是：
+
+- 如R包已安装，直接加载
+- 如R包未安装，则先（询问）安装再加载
+
+```{r eval= FALSE}
+install.packages('yulab.utils')
+```
