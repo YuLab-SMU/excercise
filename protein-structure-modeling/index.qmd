@@ -22,21 +22,9 @@ date: "`r Sys.Date()`"
 2. 使用SWISS-MODEL进行同源建模
 3. 查看比较模型
 
-实验基于R语言环境，需安装R语言，可从以下链接下载：
+实验基于R语言环境，安装R语言，可参考：
 
-- Windows版本：<https://mirrors.hust.edu.cn/CRAN/bin/windows/base/R-4.5.2-win.exe>
-- Mac版本：<https://mirrors.hust.edu.cn/CRAN/bin/macosx/big-sur-arm64/base/R-4.5.2-arm64.pkg>
-- Mac（Intel芯片）：<https://mirrors.hust.edu.cn/CRAN/bin/macosx/big-sur-x86_64/base/R-4.5.2-x86_64.pkg>
-
-可以使用RStudio集成环境，获得更好的使用体验：
-
-- <https://posit.co/download/rstudio-desktop/>
-
-设置R包镜像，以便快速安装R包。推荐使用华中科大镜像：
-
-```{r eval= FALSE}
-options(repos = c(CRAN = "https://mirrors.hust.edu.cn/CRAN/"))
-```
+- [R语言安装](../rlang/index.html)
 
 安装并加载R包`yulab.utils`，它提供了`pload()`函数，可以方便后续加载R包。
 

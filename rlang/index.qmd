@@ -1,0 +1,31 @@
+
+---
+title: "R语言安装"
+format: 
+    html:
+        embed-resources: true
+        fontsize: 1.1em
+        linestretch: 1.7
+author: "Guangchuang Yu\\
+
+        School of Basic Medical Sciences, Southern Medical University"
+date: "`r Sys.Date()`"
+---
+
+安装R语言，可从以下链接下载：
+
+- Windows版本：<https://mirrors.hust.edu.cn/CRAN/bin/windows/base/R-4.5.2-win.exe>
+- Mac版本：<https://mirrors.hust.edu.cn/CRAN/bin/macosx/big-sur-arm64/base/R-4.5.2-arm64.pkg>
+- Mac（Intel芯片）：<https://mirrors.hust.edu.cn/CRAN/bin/macosx/big-sur-x86_64/base/R-4.5.2-x86_64.pkg>
+
+可以使用RStudio或Positron集成环境，获得更好的使用体验：
+
+- <https://posit.co/download/rstudio-desktop/>
+- <https://positron.posit.co/download.html>
+
+设置R包镜像，以便快速安装R包。推荐使用华中科大镜像：
+
+```{r eval= FALSE}
+options(repos = c(CRAN = "https://mirrors.hust.edu.cn/CRAN/"))
+```
+
