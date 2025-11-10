@@ -1,0 +1,275 @@
+
+---
+title: "转录组分析"
+format: 
+    html:
+        embed-resources: true
+        fontsize: 1.1em
+        linestretch: 1.7
+author: "Guangchuang Yu\\
+
+        School of Basic Medical Sciences, Southern Medical University"
+date: "`r Sys.Date()`"
+---
+
+
+
+实验基于R语言环境，安装R语言，可参考：
+
+- [R语言安装](../rlang/index.html)
+
+
+```{r echo=FALSE, eval=FALSE}
+install.packages("BiocManager")
+
+pkg <- c("airway", "glmpca", "pheatmap",
+        "tximeta", "DESeq2", "SummarizedExperiment",
+        "org.Hs.eg.db", "clusterProfiler", "enrichplot", 
+        "AnnotationHub", "ggplot2", "dplyr", "fanyi")
+
+BiocManager::install(pkg)
+```
+
+```{r echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+library(airway)
+library(SummarizedExperiment)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(dplyr)
+# conflict_prefer("rowRanges", "MatrixGenerics")
+# conflict_prefer("slice", "dplyr")
+
+```
+
+## 示例数据
+
+```{r}
+library(yulab.utils)
+pload(airway)
+
+dir <- system.file("extdata", package="airway", mustWork=TRUE)
+list.files(dir)
+list.files(file.path(dir, "quants"))
+
+
+csvfile <- file.path(dir, "sample_table.csv")
+coldata <- read.csv(csvfile, row.names=1, stringsAsFactors=FALSE)
+coldata
+
+coldata <- coldata[1:2,]
+coldata$names <- coldata$Run
+coldata$files <- file.path(dir, "quants", coldata$names, "quant.sf.gz")
+file.exists(coldata$files)
+coldata
+```
+
+## 定量
+
+```{r eval=FALSE}
+pload("tximeta")
+se <- tximeta(coldata)
+dim(se)
+head(rownames(se))
+gse <- summarizeToGene(se)
+dim(gse)
+```
+
+上面的代码运行时间较长，可以直接加载`airway`包中的示例数据`gse`。
+
+```{r}
+data(gse, package="airway")
+gse
+```
+
+### 访问相应的信息
+
+```{r}
+pload(SummarizedExperiment)
+
+head(rownames(gse))
+assayNames(gse)
+head(assay(gse), 3)
+
+rowRanges(gse)
+seqinfo(rowRanges(gse))
+colData(gse)
+```
+
+## 差异分析
+
+### 创建DESeqDataSet对象
+
+```{r}
+pload(DESeq2)
+dds <- DESeqDataSet(gse, design = ~ donor + condition)
+hist(log(rowSums(counts(dds))))
+nrow(dds)
+keep <- rowSums(counts(dds)) > 1
+dds <- dds[keep, ]
+nrow(dds)
+```
+
+### PCA
+
+```{r}
+pload(glmpca)
+gpca <- glmpca(counts(dds), L=2)
+gpca.dat <- gpca$factors
+gpca.dat$condition <- dds$condition
+gpca.dat$donor <- dds$donor
+head(gpca.dat)
+
+pload(ggplot2)
+ggplot(gpca.dat, aes(x = dim1, y = dim2, 
+                    color = condition, shape = donor)) +
+  geom_point(size =3) + 
+  ggtitle("glmpca - Generalized PCA")
+```
+
+### 差异表达分析
+```{r}
+dds <- DESeq(dds)
+res <- results(dds)
+res
+summary(res)
+```
+
+
+```{r echo=FALSE, eval=FALSE}
+p1 = ggplot(as.data.frame(res), 
+        aes(log2FoldChange, -log10(pvalue), 
+        color=abs(log2FoldChange)> 2 & pvalue < 0.01)) + 
+    geom_point() + 
+    scale_color_manual(values=c("grey", 'firebrick')) + 
+    theme(legend.position='none')
+
+d = as.data.frame(res)
+p2=ggplot(d, aes(log2FoldChange)) + geom_density()
+
+p <- -log10(d$pvalue)
+pi <- pretty(p, 10)
+
+d2 = cut(p, pi) |> table() |> as.data.frame()
+
+p3 <- ggplot(d2, aes(Var1, Freq)) + geom_col() + 
+    theme_minimal() +
+    xlab("p value intervals") +
+    ylab("Frequency") + 
+    ggtitle("p value distribution") + coord_flip()
+
+
+p3 = ggplot(d, aes(-log10(pvalue))) + geom_density() + coord_flip()
+p4 = ggplot(d, aes(x=1, -log10(pvalue))) + geom_boxplot()
+p3
+library(aplot)
+insert_top(p1, p2, height=.3) |> insert_right(p3, width=.3)
+summary(res)
+```
+
+### 火山图
+
+```{r}
+pload(org.Hs.eg.db)
+df <- as.data.frame(res)
+df$gene_id <- sub("\\.\\w+$", "", rownames(df))
+df$symbol <- mapIds(org.Hs.eg.db, 
+                    keys = df$gene_id,
+                    column = "SYMBOL", 
+                    keytype = "ENSEMBL", 
+                    multiVals = "first")
+head(df)
+
+pload(ivolcano)
+ivolcano(df,
+        logFC_col = "log2FoldChange",
+        pval_col = "padj",
+        gene_col = "symbol",
+        top_n = 5,
+        onclick_fun=onclick_genecards)
+```        
+
+### 基因表达水平
+
+```{r}
+resSig <- subset(res, padj < 0.01)
+topGene <- rownames(res)[which.min(res$padj)]
+topGene
+
+geneCounts <- plotCounts(dds, gene = topGene, 
+                intgroup = c("donor", "condition"), 
+                returnData = TRUE)
+geneCounts
+ggplot(geneCounts, aes(condition, count)) + 
+    geom_boxplot(aes(fill=condition), alpha=.3) +
+    geom_point(aes(color=donor)) + 
+    geom_line(aes(group=donor, color=donor)) +
+    scale_y_log10()
+```
+
+### 差异基因热图
+
+```{r fig.show='hide'}
+rlog_expr <- assay(rlog(dds))
+mat1 <- rlog_expr[order(res$padj)[1:20], ]
+
+pload(dplyr)
+res2 <- as.data.frame(res)
+res2$ID <- rownames(res2)
+de <- arrange(res2, padj) |>
+    group_by(sign(log2FoldChange)) |>
+    slice(1:20) |>
+    pull(ID)
+
+mat2 <- rlog_expr[de, ]
+
+anno <- as.data.frame(colData(dds)[, c("donor", "condition")])
+
+
+plot_heatmap <- function(mat, anno) {
+    mat <- mat - rowMeans(mat)
+    p <- pheatmap::pheatmap(mat, annotation_col = anno)
+    return(p)
+}
+
+p1 <- plot_heatmap(mat1, anno)
+p2 <- plot_heatmap(mat2, anno)
+```
+
+```{r fig.width=16, fig.height=10}
+aplot::plot_list(p1, p2)
+```
+
+
+## 富集分析
+
+```{r}
+df$entrez <- mapIds(org.Hs.eg.db, 
+                    keys = df$gene_id,
+                    column = "ENTREZID", 
+                    keytype = "ENSEMBL", 
+                    multiVals = "first")
+
+# resSig <- subset(df, padj < 0.01)
+resSig <- df[order(df$padj)[1:100], ]
+
+library(clusterProfiler)
+x <- enrichGO(resSig$entrez, OrgDb = org.Hs.eg.db, ont="BP", readable=TRUE)
+dotplot(x)
+
+fc <- resSig$log2FoldChange
+names(fc) <- resSig$symbol
+cnetplot(x, foldChange=fc)
+```
+
+
+## Bonus: 基因信息检索
+
+```{r}
+pload(fanyi)
+gs <- gene_summary(df$entrez[1:10])
+gs$summary2 <- translate(gs$summary)
+
+head(gs)
+
+translate_ggplot(dotplot(x), axis='y')
+```
