@@ -45,3 +45,12 @@ install.packages('yulab.utils')
 ```{r eval= FALSE}
 install.packages("BiocManager")
 ```
+
+设置Bioconductor镜像，以便快速安装R包。推荐使用中科大镜像：
+
+```{r eval= FALSE}
+options(BioC_mirror = "http://mirrors.ustc.edu.cn/bioc")
+```
+
+R镜像测速，可使用`r yulab.utils::CRANpkg("mirrorselect")`包。
+
