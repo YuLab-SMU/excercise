@@ -276,6 +276,6 @@ head(gs)
 translate_ggplot(dotplot(x), axis='y')
 ```
 
-使用`translate_ggplot`需要用户有相应翻译源的`appid`与`key`。可以自行搜索“如何申请百度翻译API，从而获得`appid`与`key`”。再
+使用`translate_ggplot`需要用户有相应翻译源的`appid`与`key`。可以自行搜索“如何申请百度翻译API，或者参考[fanyi包的README文档](https://github.com/YuLab-SMU/fanyi)，从而获得`appid`与`key`”。再
 使用`set_translate_option(appid = "appidxxxxxxx", key="keyxxxxxxxxx", source = 'baidu')`
 
