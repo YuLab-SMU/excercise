@@ -46,11 +46,35 @@ install.packages('yulab.utils')
 install.packages("BiocManager")
 ```
 
+`yulab.utils`软件包中提供了`pload()`函数，可以方便后续（安装）加载R包。
+
+`pload()`的逻辑是：
+
+- 如R包已安装，直接加载
+- 如R包未安装，则先（询问是否安装，选择1）安装再加载
+
+
 设置Bioconductor镜像，以便快速安装R包。推荐使用中科大镜像：
 
 ```{r eval= FALSE}
 options(BioC_mirror = "http://mirrors.ustc.edu.cn/bioc")
 ```
 
+如果是低版本的`R`用到旧版本的`Bioc`，则可以使用西湖大学的镜像：
+
+```{r eval = FALSE}
+options(BioC_mirror = "https://mirrors.westlake.edu.cn/bioconductor")
+```
+
 R镜像测速，可使用`r yulab.utils::CRANpkg("mirrorselect")`包。
 
+安装`Rtools`:
+
+一些R软件包有搭配`C`、`C++`、`Fortran`等语言进行开发的情况下， `对于`Windows`与`Mac`系统，`CRAN`与`Bionductor`平台一般会提供已经编译好的安装包，但是在版本发布初期（`Bionductor`每半年一次，一般是5月与10月底左右）可能没有及时提供最新编译版本。这时候在`Windows`或者`Mac`系统下就可能需要`Rtools`软件进行本地编译安装相应的依赖包。（`Rtools`提供了`gcc`, `g++`, `make`等编译环境，且与R版本经常绑定, 即需要根据安装的`R`版本选择相应的`Rtools`版本进行安装）。
+
+`R4.5`需要的Rtools45: <https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools45/files/rtools45-6691-6492.exe>
+`R4.4`需要的Rtools44: <https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools44/files/rtools44-6459-6401.exe>
+
+以上是`Windows x86`的版本，其他版本可以到相应的下载文件夹下找<https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools45/files/>
+
+对于`Linux`系统则不需要安装`Rtools`，因为其可以使用系统提供的编译环境进行编译安装。

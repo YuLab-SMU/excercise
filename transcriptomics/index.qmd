@@ -43,7 +43,7 @@ library(dplyr)
 
 ## 示例数据
 
-```{r}
+```{r }
 library(yulab.utils)
 pload(airway)
 
@@ -65,7 +65,7 @@ coldata
 
 ## 定量
 
-```{r eval=FALSE}
+```{r eval=FALSE, class.source = 'fold-hide'}
 pload("tximeta")
 se <- tximeta(coldata)
 dim(se)
@@ -74,12 +74,14 @@ gse <- summarizeToGene(se)
 dim(gse)
 ```
 
-上面的代码运行时间较长，可以直接加载`airway`包中的示例数据`gse`。
+上面折叠代码运行时间较长，可以直接加载`airway`包中的示例数据`gse`。
 
 ```{r}
 data(gse, package="airway")
 gse
 ```
+
+`gse`是一个存储为`SummarizedExperiment`结构的数据，其中的基因定量丰度表, 样本信息以及基因信息的访问，具体操作如下。
 
 ### 访问相应的信息
 
@@ -161,7 +163,7 @@ p3 <- ggplot(d2, aes(Var1, Freq)) + geom_col() +
 p3 = ggplot(d, aes(-log10(pvalue))) + geom_density() + coord_flip()
 p4 = ggplot(d, aes(x=1, -log10(pvalue))) + geom_boxplot()
 p3
-library(aplot)
+pload(aplot)
 insert_top(p1, p2, height=.3) |> insert_right(p3, width=.3)
 summary(res)
 ```
@@ -186,7 +188,7 @@ ivolcano(df,
         gene_col = "symbol",
         top_n = 5,
         onclick_fun=onclick_genecards)
-```        
+```
 
 ### 基因表达水平
 
@@ -252,7 +254,7 @@ df$entrez <- mapIds(org.Hs.eg.db,
 # resSig <- subset(df, padj < 0.01)
 resSig <- df[order(df$padj)[1:100], ]
 
-library(clusterProfiler)
+pload(clusterProfiler)
 x <- enrichGO(resSig$entrez, OrgDb = org.Hs.eg.db, ont="BP", readable=TRUE)
 dotplot(x)
 
@@ -273,3 +275,7 @@ head(gs)
 
 translate_ggplot(dotplot(x), axis='y')
 ```
+
+使用`translate_ggplot`需要用户有相应翻译源的`appid`与`key`。可以自行搜索“如何申请百度翻译API，或者参考[fanyi包的README文档](https://github.com/YuLab-SMU/fanyi)，从而获得`appid`与`key`”。再
+使用`set_translate_option(appid = "appidxxxxxxx", key="keyxxxxxxxxx", source = 'baidu')`
+
