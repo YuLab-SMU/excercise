@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Guangchuang Yu School of Basic Medical Sciences, Southern Medical University">
-<meta name="dcterms.date" content="2025-11-11">
+<meta name="dcterms.date" content="2025-11-30">
 
 <title>R语言安装</title>
 <style>
@@ -2227,7 +2227,7 @@ School of Basic Medical Sciences, Southern Medical University </p>
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">November 11, 2025</p>
+      <p class="date">November 30, 2025</p>
     </div>
   </div>
   
@@ -2267,11 +2267,26 @@ School of Basic Medical Sciences, Southern Medical University </p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="st">&quot;BiocManager&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p><code>yulab.utils</code>软件包中提供了<code>pload()</code>函数，可以方便后续（安装）加载R包。</p>
+<p><code>pload()</code>的逻辑是：</p>
+<ul>
+<li>如R包已安装，直接加载</li>
+<li>如R包未安装，则先（询问是否安装，选择1）安装再加载</li>
+</ul>
 <p>设置Bioconductor镜像，以便快速安装R包。推荐使用中科大镜像：</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">BioC_mirror =</span> <span class="st">&quot;http://mirrors.ustc.edu.cn/bioc&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+<p>如果是低版本的<code>R</code>用到旧版本的<code>Bioc</code>，则可以使用西湖大学的镜像：</p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">BioC_mirror =</span> <span class="st">&quot;https://mirrors.westlake.edu.cn/bioconductor&quot;</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
 <p>R镜像测速，可使用<a href="https://CRAN.R-project.org/package=mirrorselect">mirrorselect</a>包。</p>
+<p>安装<code>Rtools</code>:</p>
+<p>一些R软件包有搭配<code>C</code>、<code>C++</code>、<code>Fortran</code>等语言进行开发的情况下， <code>对于</code>Windows<code>与</code>Mac<code>系统，</code>CRAN<code>与</code>Bionductor<code>平台一般会提供已经编译好的安装包，但是在版本发布初期（</code>Bionductor<code>每半年一次，一般是5月与10月底左右）可能没有及时提供最新编译版本。这时候在</code>Windows<code>或者</code>Mac<code>系统下就可能需要</code>Rtools<code>软件进行本地编译安装相应的依赖包。（</code>Rtools<code>提供了</code>gcc<code>,</code>g++<code>,</code>make<code>等编译环境，且与R版本经常绑定, 即需要根据安装的</code>R<code>版本选择相应的</code>Rtools`版本进行安装）。</p>
+<p><code>R4.5</code>需要的Rtools45: <a href="https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools45/files/rtools45-6691-6492.exe" class="uri">https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools45/files/rtools45-6691-6492.exe</a> <code>R4.4</code>需要的Rtools44: <a href="https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools44/files/rtools44-6459-6401.exe" class="uri">https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools44/files/rtools44-6459-6401.exe</a></p>
+<p>以上是<code>Windows x86</code>的版本，其他版本可以到相应的下载文件夹下找<a href="https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools45/files/" class="uri">https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/rtools45/files/</a></p>
+<p>对于<code>Linux</code>系统则不需要安装<code>Rtools</code>，因为其可以使用系统提供的编译环境进行编译安装。</p>
 
 </main>
 <!-- /main column -->

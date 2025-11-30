@@ -19,7 +19,9 @@ date: "`r Sys.Date()`"
 - [R语言安装](../rlang/index.html)
 
 
-```{r echo=FALSE, eval=FALSE}
+```{r}
+#| echo: false
+#| eval: false
 install.packages("BiocManager")
 
 pkg <- c("airway", "glmpca", "pheatmap",
@@ -30,7 +32,11 @@ pkg <- c("airway", "glmpca", "pheatmap",
 BiocManager::install(pkg)
 ```
 
-```{r echo=FALSE, results='hide', message=FALSE, warning=FALSE}
+```{r}
+#| echo: false
+#| results: 'hide'
+#| message: false
+#| warning: false
 library(airway)
 library(SummarizedExperiment)
 library(org.Hs.eg.db)
@@ -43,7 +49,7 @@ library(dplyr)
 
 ## 示例数据
 
-```{r }
+```{r}
 library(yulab.utils)
 pload(airway)
 
@@ -65,7 +71,9 @@ coldata
 
 ## 定量
 
-```{r eval=FALSE, class.source = 'fold-hide'}
+```{r}
+#| code-fold: true
+#| eval: false
 pload("tximeta")
 se <- tximeta(coldata)
 dim(se)
@@ -137,7 +145,9 @@ summary(res)
 ```
 
 
-```{r echo=FALSE, eval=FALSE}
+```{r}
+#| echo: false
+#| eval: false
 p1 = ggplot(as.data.frame(res), 
         aes(log2FoldChange, -log10(pvalue), 
         color=abs(log2FoldChange)> 2 & pvalue < 0.01)) + 
@@ -210,7 +220,8 @@ ggplot(geneCounts, aes(condition, count)) +
 
 ### 差异基因热图
 
-```{r fig.show='hide'}
+```{r}
+#| fig-show: 'hide'
 rlog_expr <- assay(rlog(dds))
 mat1 <- rlog_expr[order(res$padj)[1:20], ]
 
