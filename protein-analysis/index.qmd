@@ -1,0 +1,221 @@
+
+---
+title: "蛋白质组与蛋白质分析"
+format:
+    html:
+        embed-resources: true
+        fontsize: 1.1em
+        linestretch: 1.7
+author: "Guangchuang Yu\\
+
+        School of Basic Medical Sciences, Southern Medical University"
+date: "`r Sys.Date()`"
+---
+
+实验基于R语言环境，安装R语言，可参考：
+
+- [R语言安装](../rlang/index.html)
+
+
+本实验以一组与**DNA损伤应答**密切相关的蛋白为例，用R完成一条"**从蛋白序列 → 基本属性 → 相互作用网络 → 功能富集 → 质谱定量（拓展）**"的分析链，呼应课堂《蛋白质组与蛋白质分析》。涉及的蛋白：**p53 (TP53)、MDM2、BRCA1、BRCA2、ATM、CHK2、CDKN2A**。
+
+```{r}
+#| echo: false
+#| eval: false
+install.packages("BiocManager")
+
+pkg <- c("yulab.utils", "rentrez", "Biostrings", "Peptides",
+        "clusterProfiler", "org.Hs.eg.db", "enrichplot", "MSstats")
+
+BiocManager::install(pkg)
+
+## 自研包 mechgraph、ggtangle 另装（不在 Bioconductor 上）：
+# install.packages("path/to/mechgraph", repos = NULL, type = "source")
+# install.packages("path/to/ggtangle",  repos = NULL, type = "source")
+```
+
+```{r}
+#| echo: false
+#| results: 'hide'
+#| message: false
+#| warning: false
+library(yulab.utils)
+```
+
+## 一、蛋白序列下载与基本属性
+
+### 用 rentrez 从 NCBI 下载序列
+
+本节直接从 NCBI 下载这 7 个蛋白的 RefSeq 蛋白序列。给定蛋白的 RefSeq **accession**，用 `rentrez::entrez_fetch()` 获取 FASTA；NCBI 页面：<https://www.ncbi.nlm.nih.gov/protein>。
+
+```{r}
+pload(rentrez)
+
+acc <- c(TP53  = "NP_000537.3",
+         MDM2  = "NP_002383.2",
+         BRCA1 = "NP_009225.1",
+         BRCA2 = "NP_001419006.1",
+         ATM   = "NP_000042.3",
+         CHEK2 = "NP_001005735.1",
+         CDKN2A= "NP_000068.1")
+
+fa <- vapply(acc, function(a) entrez_fetch(db = "protein", id = a,
+                                           rettype = "fasta"),
+             character(1))
+cat(fa, sep = "", file = "proteins_ncbi.fasta")
+```
+
+> 项目目录中另附了一份 `proteins.fasta`（来自 [UniProt](https://www.uniprot.org)）作为离线备份；若 NCBI 暂时不可用，可直接读它。
+
+```{r}
+pload(Biostrings)
+seqs <- readAAStringSet("proteins_ncbi.fasta")
+names(seqs) <- names(acc)   # 按下载顺序对应到基因名
+seqs
+```
+
+### 蛋白长度与氨基酸组成
+
+```{r}
+len <- width(seqs)
+data.frame(gene = names(seqs), length = len)
+```
+
+```{r}
+aa <- alphabetFrequency(seqs, baseOnly = TRUE)
+rownames(aa) <- names(seqs)
+round(aa[ , apply(aa, 2, function(x) sd(x) > 0)], 2)
+```
+
+### 分子量与等电点（`Peptides`，权威计算）
+
+用 `Peptides` 计算分子量与等电点，避免自己手写氨基酸质量表（`Peptides::mw()` 使用标准残基质量）。
+
+```{r}
+pload(Peptides)
+res <- data.frame(
+  gene = names(seqs),
+  length = len,
+  mw  = vapply(as.character(seqs), function(s) mw(s), numeric(1)),
+  pI  = vapply(as.character(seqs), function(s) pI(s), numeric(1))
+)
+res[, c("mw", "pI")] <- round(res[, c("mw", "pI")], 1)
+res
+```
+
+**思考**：BRCA2、ATM 为何"又长又重"？pI 与蛋白在细胞中的定位/功能有何关系？
+
+## 二、蛋白相互作用网络（mechgraph + ggtangle）
+
+`mechgraph` 负责从数据库下载并构建"机制证据图"（`mechgraph` 对象，含节点/边表）；`ggtangle` 现在能**直接接收 `mechgraph` 对象**——`ggplot(mg)` 自动把节点/边转成网络图，边用 `geom_edge()`，节点 `size` 自动为度（degree）。
+
+**用哪个数据库？** 两种都可：`mg_from_biogrid()` 取 **BioGRID**（数据小，约几十 MB；对这些 DNA 损伤基因连通性很好，实测 7 个基因同属 1 个连通分量）；`mg_from_string()` 取 **STRING**（更大，首次下载较多；解析时会去除重复边，图更干净）。
+
+### 用 mechgraph 下载网络 + 聚焦到我们的基因
+
+```{r}
+pload(mechgraph)
+mg <- mg_from_biogrid(taxon_id = 9606, dataset = "mv_physical")
+mg
+```
+
+```{r}
+genes <- c("TP53", "MDM2", "BRCA1", "BRCA2", "ATM", "CHEK2", "CDKN2A")
+mg2 <- mg_induced_subgraph(mg, genes)
+mg_nodes(mg2)
+mg_edges(mg2)
+```
+
+> BioGRID 同一对蛋白之间常有多条"证据边"，画图前可先**只保留唯一蛋白对**，观察会更清晰：
+> `g <- igraph::graph_from_data_frame(unique(mg_edges(mg2)[, c("from","to")]), directed = FALSE)`
+
+### 用 ggtangle 直接可视化 mechgraph
+
+```{r}
+pload(ggtangle)
+ggplot(mg2, layout = "circular") +
+    geom_edge(alpha = .4, color = "#9AA5B1") +
+    geom_point(aes(size = size), color = "#0B4F6C", show.legend = FALSE) +
+    geom_label(aes(label = name), size = 3.5) +
+    theme_void()
+```
+
+**思考**：图中最大的节点（度最高）是哪个蛋白？为何它在 DNA 损伤应答中如此核心？（这组基因在 BioGRID 中高度连通，TP53 是最核心的 hub。）
+
+> 需要具体的度数值时，可用 `mechgraph::as.igraph(mg2)` 把 `mechgraph` 转成 `igraph`（节点/边信息会作为 igraph 属性保留），再 `igraph::degree(g)`。若改用 STRING，只需把下载语句换成：`mg <- mg_from_string(taxon_id = 9606, keytype = "symbol", score_threshold = 700)`。
+
+## 三、功能富集分析
+
+这组蛋白"一起做什么"？用它们的基因做 GO 富集。
+
+```{r}
+entrez <- c(TP53 = 7157, MDM2 = 4193, BRCA1 = 672, BRCA2 = 675,
+            ATM = 472, CHEK2 = 11200, CDKN2A = 1029)
+```
+
+```{r}
+pload(clusterProfiler)
+pload(org.Hs.eg.db)
+x <- enrichGO(entrez, OrgDb = org.Hs.eg.db, ont = "BP",
+              pvalueCutoff = 0.2, qvalueCutoff = 0.2, readable = TRUE)
+x
+```
+
+```{r}
+dotplot(x)
+cnetplot(x, showCategory = 5)
+```
+
+**思考**：富集到的最显著生物学过程是什么？与你对这组蛋白功能的直觉一致吗？
+
+## 四、拓展：质谱定量分析（MSstats）
+
+如果拿到质谱（如 MaxQuant）的定量数据，可用 `MSstats` 做蛋白水平的差异丰度分析。
+
+### 用 MSstats 做蛋白差异丰度分析
+
+```{r}
+pload(MSstats)
+data(DDARawData)   # 内置示例：label-free DDA 刺入实验（6 蛋白 / 6 条件）
+head(DDARawData)
+```
+
+```{r}
+processed <- dataProcess(DDARawData)   # 肽段→蛋白水平汇总
+names(processed)
+```
+
+构造对比矩阵（比较 C6 与 C4，即"刺入高 vs 低"），做组间比较：
+
+```{r}
+lv <- c("C1", "C2", "C3", "C4", "C5", "C6")
+cm <- matrix(0, nrow = 1, ncol = 6, dimnames = list("C6-vs-C4", lv))
+cm[1, "C4"] <- -1
+cm[1, "C6"] <- 1
+
+cmp <- groupComparison(contrast.matrix = cm, data = processed)
+res <- cmp$ComparisonResult   # 每蛋白的 log2FoldChange、p 值等
+res
+```
+
+火山图（用 `ggplot2` 画，x = log2FC，y = -log10(adj.pvalue)）：
+
+```{r}
+pload(ggplot2)
+ggplot(res, aes(log2FoldChange, -log10(adj.pvalue),
+                color = adj.pvalue < 0.05 & abs(log2FoldChange) > 1)) +
+    geom_point(size = 3) +
+    scale_color_manual(values = c("grey80", "firebrick")) +
+    theme_minimal() +
+    theme(legend.position = "none")
+```
+
+> 实际的质谱数据可先用 `MaxQtoMSstatsFormat(evidence, annotation)` 将 MaxQuant 的 `evidence.txt` 转成 MSstats 格式，再走上面 `dataProcess()` + `groupComparison()` 流程。
+
+**思考**：质谱定量的"差异分析"思路与转录组的 `DESeq2`/`limma` 有何异同？
+
+## 五、小结
+
+- **R 分析链**：序列下载（`rentrez`）→ 基本属性（`Biostrings`/`Peptides`）→ 互作网络（`mechgraph` 下载 + `ggtangle` 可视化）→ 功能富集（`clusterProfiler`）→ 定量（`MSstats`）。
+- **与课堂呼应**：把课堂上的 STRING、质谱定量、GO/KEGG 等工具真正跑了一遍。
+- 进一步可拓展：蛋白修饰位点分析、序列 Motif 检索、用 `mechgraph::as.igraph()` 把 `mechgraph` 交给别的 graph 工具进一步分析等。
