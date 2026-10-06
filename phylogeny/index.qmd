@@ -11,11 +11,14 @@ author: "Guangchuang Yu\\
 date: "`r Sys.Date()`"
 ---
 
-本实验把课堂上的人—金枪鱼细胞色素 c 案例迁移到一套完整的 8 物种蛋白序列数据。你将重复课堂的证据链：
+数据文件包含 8 个物种的细胞色素 c 蛋白序列。完成以下分析：
 
-> identity 与局部比对 → 多序列比对 → 距离矩阵 → NJ 树 → bootstrap 支持度 → ML 扩展
+- Human–Tuna 的 identity、score 和比对长度；
+- 局部比对结果与多序列比对；
+- 保守列、距离矩阵和 NJ 树；
+- bootstrap 支持度与 WAG 模型 ML 树比较。
 
-数据文件已经随实验提供，不依赖网络下载。FASTA 标题中保留了 NCBI、UniProt 或 PDB 的 accession，便于追溯来源。
+数据文件随实验提供，FASTA 标题保留 NCBI、UniProt 或 PDB accession。
 
 ## 环境准备
 
@@ -27,7 +30,7 @@ install.packages(c("ape", "phangorn", "ggplot2", "dplyr", "yulab.utils"))
 BiocManager::install(c("Biostrings", "pwalign", "DECIPHER", "ggtree", "tidytree", "treeio"))
 ```
 
-主线需要 `Biostrings`、`pwalign`、`DECIPHER`、`ape`、`phangorn` 和 `ggtree`。不再强制安装 `muscle` 或 `rentrez`：本实验使用目录中的真实蛋白序列和预计算 MSA，避免课堂因网络或外部比对程序中断。
+主线需要 `Biostrings`、`pwalign`、`DECIPHER`、`ape`、`phangorn` 和 `ggtree`。`muscle`、`rentrez` 和网络下载不是必需依赖；目录中的 FASTA 和预计算 MSA 支持离线运行。
 
 ```{r}
 #| echo: false
@@ -63,7 +66,7 @@ width(cytc)
 
 ## 2. 人和金枪鱼：80.6% 到底是什么量？
 
-课堂上的 80.6% 是全长序列在局部比对中的 **identity**：对齐位置上完全相同的氨基酸比例。它不是“同源性的百分比”，也不是单独足以证明同源的结论。
+80.6% 是全长序列局部比对中的 **identity**：对齐位置上完全相同的氨基酸比例。它不是“同源性的百分比”，也不能单独证明同源。
 
 ```{r}
 pload(pwalign)
@@ -113,7 +116,7 @@ local_hits
 
 ## 4. 多序列比对与保守位点
 
-实验目录附带 `cytc_msa.fasta`，由 `DECIPHER::AlignSeqs()` 对同一组真实序列计算得到。先使用预计算结果保证课堂可重复；如果想重算，可删除该文件后运行备用分支。
+`cytc_msa.fasta` 是由 `DECIPHER::AlignSeqs()` 对同一组序列计算得到的预计算结果。优先读取该文件；删除该文件后可运行备用分支重新计算。
 
 ```{r}
 msa_file <- "cytc_msa.fasta"
@@ -188,7 +191,7 @@ ggtree(tree_nj_bs) +
   ggtitle("NJ tree with bootstrap support (50 replicates)")
 ```
 
-50 次重采样适合课堂演示速度，不等于正式研究中的唯一标准。低支持度分支应被标记为不确定，而不是被解释成确定的物种关系。
+bootstrap 重采样次数为 50。低支持度分支应标记为不确定，不应解释成确定的物种关系。
 
 ## 7. 扩展：用蛋白替换模型做 ML 树
 

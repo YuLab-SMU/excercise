@@ -37,7 +37,7 @@ BiocManager::install(optional_pkg)
 install.packages(c("fanyi", "ivolcano", "aplot"))
 ```
 
-本练习的主线只依赖 `airway`、`DESeq2`、`SummarizedExperiment`、`org.Hs.eg.db`、`clusterProfiler`、`enrichplot`、`ggplot2`、`dplyr` 与 `pheatmap`。`glmpca`、`tximeta`、`AnnotationHub` 和翻译/交互扩展属于可选包；未安装 `glmpca` 时，PCA 小节会自动使用 DESeq2 的 `vst()` 备用路线。
+核心运行依赖为 `airway`、`DESeq2`、`SummarizedExperiment`、`org.Hs.eg.db`、`clusterProfiler`、`enrichplot`、`ggplot2`、`dplyr` 与 `pheatmap`。`glmpca`、`tximeta`、`AnnotationHub` 和翻译/交互扩展为可选包；未安装 `glmpca` 时，PCA 小节使用 DESeq2 的 `vst()` 备用路线。
 
 ```{r}
 #| echo: false
@@ -319,7 +319,7 @@ cnetplot(x, foldChange = fc)
 
 ## 结果审计任务
 
-完成主线后，再做一次“结果验尸”：
+结果审计：
 
 1. 比较原始 `log2FoldChange` 与 `res_shrunk` 的效应量，挑一个低计数基因说明 shrinkage 为什么会改变排序；
 2. 在 PCA、MA 图、火山图和 top-gene 表中，至少指出一个“统计显著但效应量很小”或“效应量大但不显著”的基因；
@@ -344,5 +344,5 @@ if (requireNamespace("fanyi", quietly = TRUE)) {
 ```
 
 
-在线翻译是可选扩展，不影响主线分析。若要使用 `translate_ggplot`，请先按 [fanyi 包 README](https://github.com/YuLab-SMU/fanyi) 申请并配置百度翻译 `appid` 与 `key`，再运行上一个代码块中的配置示例。
+在线翻译为可选扩展。使用 `translate_ggplot` 前，请先按 [fanyi 包 README](https://github.com/YuLab-SMU/fanyi) 申请并配置百度翻译 `appid` 与 `key`，再运行上一个代码块中的配置示例。
 

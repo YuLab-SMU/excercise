@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Guangchuang Yu School of Basic Medical Sciences, Southern Medical University">
-<meta name="dcterms.date" content="2026-10-05">
+<meta name="dcterms.date" content="2026-10-06">
 
 <title>细胞色素 c：序列比对与系统发育分析</title>
 <style>
@@ -2230,7 +2230,7 @@ School of Basic Medical Sciences, Southern Medical University </p>
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">October 5, 2026</p>
+      <p class="date">October 6, 2026</p>
     </div>
   </div>
   
@@ -2242,11 +2242,14 @@ School of Basic Medical Sciences, Southern Medical University </p>
 </header>
 
 
-<p>本实验把课堂上的人—金枪鱼细胞色素 c 案例迁移到一套完整的 8 物种蛋白序列数据。你将重复课堂的证据链：</p>
-<blockquote class="blockquote">
-<p>identity 与局部比对 → 多序列比对 → 距离矩阵 → NJ 树 → bootstrap 支持度 → ML 扩展</p>
-</blockquote>
-<p>数据文件已经随实验提供，不依赖网络下载。FASTA 标题中保留了 NCBI、UniProt 或 PDB 的 accession，便于追溯来源。</p>
+<p>数据文件包含 8 个物种的细胞色素 c 蛋白序列。完成以下分析：</p>
+<ul>
+<li>Human–Tuna 的 identity、score 和比对长度；</li>
+<li>局部比对结果与多序列比对；</li>
+<li>保守列、距离矩阵和 NJ 树；</li>
+<li>bootstrap 支持度与 WAG 模型 ML 树比较。</li>
+</ul>
+<p>数据文件随实验提供，FASTA 标题保留 NCBI、UniProt 或 PDB accession。</p>
 <section id="环境准备" class="level2">
 <h2 class="anchored" data-anchor-id="环境准备">环境准备</h2>
 <div class="cell">
@@ -2254,7 +2257,7 @@ School of Basic Medical Sciences, Southern Medical University </p>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="fu">install.packages</span>(<span class="fu">c</span>(<span class="st">&quot;ape&quot;</span>, <span class="st">&quot;phangorn&quot;</span>, <span class="st">&quot;ggplot2&quot;</span>, <span class="st">&quot;dplyr&quot;</span>, <span class="st">&quot;yulab.utils&quot;</span>))</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>BiocManager<span class="sc">::</span><span class="fu">install</span>(<span class="fu">c</span>(<span class="st">&quot;Biostrings&quot;</span>, <span class="st">&quot;pwalign&quot;</span>, <span class="st">&quot;DECIPHER&quot;</span>, <span class="st">&quot;ggtree&quot;</span>, <span class="st">&quot;tidytree&quot;</span>, <span class="st">&quot;treeio&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>主线需要 <code>Biostrings</code>、<code>pwalign</code>、<code>DECIPHER</code>、<code>ape</code>、<code>phangorn</code> 和 <code>ggtree</code>。不再强制安装 <code>muscle</code> 或 <code>rentrez</code>：本实验使用目录中的真实蛋白序列和预计算 MSA，避免课堂因网络或外部比对程序中断。</p>
+<p>主线需要 <code>Biostrings</code>、<code>pwalign</code>、<code>DECIPHER</code>、<code>ape</code>、<code>phangorn</code> 和 <code>ggtree</code>。<code>muscle</code>、<code>rentrez</code> 和网络下载不是必需依赖；目录中的 FASTA 和预计算 MSA 支持离线运行。</p>
 </section>
 <section id="读取真实序列" class="level2">
 <h2 class="anchored" data-anchor-id="读取真实序列">1. 读取真实序列</h2>
@@ -2284,7 +2287,7 @@ School of Basic Medical Sciences, Southern Medical University </p>
 </section>
 <section id="人和金枪鱼80.6-到底是什么量" class="level2">
 <h2 class="anchored" data-anchor-id="人和金枪鱼80.6-到底是什么量">2. 人和金枪鱼：80.6% 到底是什么量？</h2>
-<p>课堂上的 80.6% 是全长序列在局部比对中的 <strong>identity</strong>：对齐位置上完全相同的氨基酸比例。它不是“同源性的百分比”，也不是单独足以证明同源的结论。</p>
+<p>80.6% 是全长序列局部比对中的 <strong>identity</strong>：对齐位置上完全相同的氨基酸比例。它不是“同源性的百分比”，也不能单独证明同源。</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">pload</span>(pwalign)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stderr">
@@ -2358,7 +2361,7 @@ School of Basic Medical Sciences, Southern Medical University </p>
 </section>
 <section id="多序列比对与保守位点" class="level2">
 <h2 class="anchored" data-anchor-id="多序列比对与保守位点">4. 多序列比对与保守位点</h2>
-<p>实验目录附带 <code>cytc_msa.fasta</code>，由 <code>DECIPHER::AlignSeqs()</code> 对同一组真实序列计算得到。先使用预计算结果保证课堂可重复；如果想重算，可删除该文件后运行备用分支。</p>
+<p><code>cytc_msa.fasta</code> 是由 <code>DECIPHER::AlignSeqs()</code> 对同一组序列计算得到的预计算结果。优先读取该文件；删除该文件后可运行备用分支重新计算。</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>msa_file <span class="ot">&lt;-</span> <span class="st">&quot;cytc_msa.fasta&quot;</span></span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -2477,7 +2480,7 @@ Wheat      0.321      0.321 0.321   0.348 0.357    0.375 0.366 0.000</code></pre
 </div>
 </div>
 </div>
-<p>50 次重采样适合课堂演示速度，不等于正式研究中的唯一标准。低支持度分支应被标记为不确定，而不是被解释成确定的物种关系。</p>
+<p>bootstrap 重采样次数为 50。低支持度分支应标记为不确定，不应解释成确定的物种关系。</p>
 </section>
 <section id="扩展用蛋白替换模型做-ml-树" class="level2">
 <h2 class="anchored" data-anchor-id="扩展用蛋白替换模型做-ml-树">7. 扩展：用蛋白替换模型做 ML 树</h2>
