@@ -24,13 +24,20 @@ date: "`r Sys.Date()`"
 #| eval: false
 install.packages("BiocManager")
 
-pkg <- c("airway", "glmpca", "pheatmap",
-        "tximeta", "DESeq2", "SummarizedExperiment",
-        "org.Hs.eg.db", "clusterProfiler", "enrichplot", 
-        "AnnotationHub", "ggplot2", "dplyr", "fanyi")
+core_pkg <- c(
+  "airway", "pheatmap", "DESeq2", "SummarizedExperiment",
+  "org.Hs.eg.db", "clusterProfiler", "enrichplot",
+  "ggplot2", "dplyr"
+)
+BiocManager::install(core_pkg)
 
-BiocManager::install(pkg)
+# 可选：只有复现扩展章节时才需要这些包
+optional_pkg <- c("glmpca", "tximeta", "AnnotationHub")
+BiocManager::install(optional_pkg)
+install.packages(c("fanyi", "ivolcano", "aplot"))
 ```
+
+本练习的主线只依赖 `airway`、`DESeq2`、`SummarizedExperiment`、`org.Hs.eg.db`、`clusterProfiler`、`enrichplot`、`ggplot2`、`dplyr` 与 `pheatmap`。`glmpca`、`tximeta`、`AnnotationHub` 和翻译/交互扩展属于可选包；未安装 `glmpca` 时，PCA 小节会自动使用 DESeq2 的 `vst()` 备用路线。
 
 ```{r}
 #| echo: false
@@ -112,6 +119,7 @@ colData(gse)
 ```{r}
 pload(DESeq2)
 dds <- DESeqDataSet(gse, design = ~ donor + condition)
+model.matrix(~ donor + condition, data = as.data.frame(colData(dds)))
 hist(log(rowSums(counts(dds))))
 nrow(dds)
 keep <- rowSums(counts(dds)) > 1
@@ -119,30 +127,56 @@ dds <- dds[keep, ]
 nrow(dds)
 ```
 
+先检查 design formula 和样本元数据是否一致：`donor` 用来吸收配对/个体差异，`condition` 才是本次比较的主效应。若实验设计改变，不能只改 contrast 名称而不重新检查模型矩阵。
+
+
 ### PCA
 
 ```{r}
-pload(glmpca)
-gpca <- glmpca(counts(dds), L=2)
-gpca.dat <- gpca$factors
-gpca.dat$condition <- dds$condition
-gpca.dat$donor <- dds$donor
-head(gpca.dat)
+if (requireNamespace("glmpca", quietly = TRUE)) {
+  pload(glmpca)
+  gpca <- glmpca(counts(dds), L = 2)
+  gpca.dat <- gpca$factors
+  gpca.dat$condition <- dds$condition
+  gpca.dat$donor <- dds$donor
+  head(gpca.dat)
 
-pload(ggplot2)
-ggplot(gpca.dat, aes(x = dim1, y = dim2, 
-                    color = condition, shape = donor)) +
-  geom_point(size =3) + 
-  ggtitle("glmpca - Generalized PCA")
+  pload(ggplot2)
+  ggplot(gpca.dat, aes(x = dim1, y = dim2,
+                       color = condition, shape = donor)) +
+    geom_point(size = 3) +
+    ggtitle("glmpca - Generalized PCA")
+} else {
+  message("未安装 glmpca，使用 DESeq2::vst() + prcomp() 完成 PCA。")
+  vsd <- vst(dds, blind = TRUE)
+  pca <- prcomp(t(assay(vsd)))
+  pca.dat <- as.data.frame(pca$x[, 1:2])
+  pca.dat$condition <- colData(vsd)$condition
+  pca.dat$donor <- colData(vsd)$donor
+
+  pload(ggplot2)
+  ggplot(pca.dat, aes(x = PC1, y = PC2,
+                      color = condition, shape = donor)) +
+    geom_point(size = 3) +
+    ggtitle("PCA after variance-stabilizing transformation")
+}
 ```
+
 
 ### 差异表达分析
 ```{r}
 dds <- DESeq(dds)
-res <- results(dds)
+coef_name <- grep("^condition_", resultsNames(dds), value = TRUE)
+coef_name
+res <- results(dds, name = coef_name)
+res_shrunk <- lfcShrink(dds, coef = coef_name, type = "normal")
 res
 summary(res)
+head(res_shrunk[, c("log2FoldChange", "lfcSE", "padj")])
 ```
+
+这里显式记录 contrast 名称，并同时保留原始估计与收缩后的效应量。`lfcShrink()` 的目标是让低计数或高方差基因的 log2 fold change 更稳定，不是把结果“变显著”。正式分析应在报告中说明使用的 shrinkage 方法。
+
 
 
 ```{r}
@@ -263,30 +297,52 @@ df$entrez <- mapIds(org.Hs.eg.db,
                     multiVals = "first")
 
 # resSig <- subset(df, padj < 0.01)
-resSig <- df[order(df$padj)[1:100], ]
+resSig <- df[order(df$padj, na.last = NA)[1:100], ]
+gene_set <- unique(na.omit(resSig$entrez))
+universe <- unique(na.omit(df$entrez))
 
 pload(clusterProfiler)
-x <- enrichGO(resSig$entrez, OrgDb = org.Hs.eg.db, ont="BP", readable=TRUE)
+x <- enrichGO(
+  gene = gene_set,
+  universe = universe,
+  OrgDb = org.Hs.eg.db,
+  ont = "BP",
+  readable = TRUE
+)
 dotplot(x)
 
 fc <- resSig$log2FoldChange
 names(fc) <- resSig$symbol
-cnetplot(x, foldChange=fc)
+cnetplot(x, foldChange = fc)
 ```
+富集分析同时报告 `gene_set` 和 `universe`。`universe` 应代表本次实验中真正有机会被检测、注释并进入检验的基因集合；默认使用全基因组可能系统性放大富集显著性。正式报告还应记录注释包版本和数据库日期。
 
+## 结果审计任务
 
-## Bonus: 基因信息检索
+完成主线后，再做一次“结果验尸”：
+
+1. 比较原始 `log2FoldChange` 与 `res_shrunk` 的效应量，挑一个低计数基因说明 shrinkage 为什么会改变排序；
+2. 在 PCA、MA 图、火山图和 top-gene 表中，至少指出一个“统计显著但效应量很小”或“效应量大但不显著”的基因；
+3. 重新运行一次富集分析，把 `universe` 改成全基因组，记录结果变化并解释背景偏差；
+4. 在报告末尾写清 contrast、design formula、padj 阈值、lfcShrink 方法、注释版本和随机性/软件版本。
+
 
 ```{r}
-pload(fanyi)
-gs <- gene_summary(df$entrez[1:10])
-gs$summary2 <- translate(gs$summary)
-
-head(gs)
-
-translate_ggplot(dotplot(x), axis='y')
+if (requireNamespace("fanyi", quietly = TRUE)) {
+  pload(fanyi)
+  message("翻译扩展需要先配置 fanyi 的 appid/key；未配置时跳过在线翻译。")
+  # 配置后再取消下面代码的注释：
+  # set_translate_option(appid = Sys.getenv("FANYI_APPID"),
+  #                      key = Sys.getenv("FANYI_KEY"), source = "baidu")
+  # gs <- gene_summary(df$entrez[1:10])
+  # gs$summary2 <- translate(gs$summary)
+  # head(gs)
+  # translate_ggplot(dotplot(x), axis = "y")
+} else {
+  message("未安装可选包 fanyi，跳过在线翻译扩展。")
+}
 ```
 
-使用`translate_ggplot`需要用户有相应翻译源的`appid`与`key`。可以自行搜索“如何申请百度翻译API，或者参考[fanyi包的README文档](https://github.com/YuLab-SMU/fanyi)，从而获得`appid`与`key`”。再
-使用`set_translate_option(appid = "appidxxxxxxx", key="keyxxxxxxxxx", source = 'baidu')`
+
+在线翻译是可选扩展，不影响主线分析。若要使用 `translate_ggplot`，请先按 [fanyi 包 README](https://github.com/YuLab-SMU/fanyi) 申请并配置百度翻译 `appid` 与 `key`，再运行上一个代码块中的配置示例。
 

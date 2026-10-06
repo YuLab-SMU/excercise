@@ -1,7 +1,6 @@
-
 ---
-title: "多序列比对与系统发育分析"
-format: 
+title: "细胞色素 c：序列比对与系统发育分析"
+format:
     html:
         embed-resources: true
         fontsize: 1.1em
@@ -12,110 +11,212 @@ author: "Guangchuang Yu\\
 date: "`r Sys.Date()`"
 ---
 
-实验基于R语言环境，安装R语言，可参考：
+本实验把课堂上的人—金枪鱼细胞色素 c 案例迁移到一套完整的 8 物种蛋白序列数据。你将重复课堂的证据链：
 
-- [R语言安装](../rlang/index.html)
+> identity 与局部比对 → 多序列比对 → 距离矩阵 → NJ 树 → bootstrap 支持度 → ML 扩展
 
+数据文件已经随实验提供，不依赖网络下载。FASTA 标题中保留了 NCBI、UniProt 或 PDB 的 accession，便于追溯来源。
 
-```{r echo=FALSE, results='hide', message=FALSE, warning=FALSE}
-library(muscle)
+## 环境准备
+
+```{r}
+#| echo: true
+#| eval: false
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+install.packages(c("ape", "phangorn", "ggplot2", "dplyr", "yulab.utils"))
+BiocManager::install(c("Biostrings", "pwalign", "DECIPHER", "ggtree", "tidytree", "treeio"))
+```
+
+主线需要 `Biostrings`、`pwalign`、`DECIPHER`、`ape`、`phangorn` 和 `ggtree`。不再强制安装 `muscle` 或 `rentrez`：本实验使用目录中的真实蛋白序列和预计算 MSA，避免课堂因网络或外部比对程序中断。
+
+```{r}
+#| echo: false
+#| results: 'hide'
+#| message: false
+#| warning: false
+required <- c("Biostrings", "pwalign", "DECIPHER", "ape", "phangorn", "ggtree", "ggplot2", "dplyr", "yulab.utils")
+missing <- required[!vapply(required, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing)) {
+  stop("缺少 R 包：", paste(missing, collapse = ", "), "。请先按上方安装说明安装。")
+}
+
+library(Biostrings)
 library(ape)
+library(phangorn)
 library(ggtree)
-library(tidytree)
-library(treeio)
-library(seqmagick)
-```
-
-
-## 下载序列
-
-### Sylvia属鸟类线粒体cytb基因accession number
-```{r}
-x <- paste("AJ5345", 26:49, sep = "")
-x
-```
-
-### 使用rentrez包下载fasta格式的序列
-```{r}
+library(ggplot2)
+library(dplyr)
 library(yulab.utils)
-pload(rentrez)
-
-raw_recs <- entrez_fetch(db = 'nuccore', id = x, rettype = 'fasta')
-
-cytb_file <- "sylvia_cytb.fasta"
-cat(raw_recs, file = cytb_file)
 ```
 
-## 多序列比对
-
-### 读取序列
+## 1. 读取真实序列
 
 ```{r}
-pload(seqmagick)
-
-cybt <- fa_read(cytb_file)
-cybt
+cytc_file <- "cytc_8species.fasta"
+cytc <- readAAStringSet(cytc_file)
+names(cytc) <- sub("_.*$", "", names(cytc))
+cytc
+width(cytc)
 ```
 
-### 序列比对
+先核对序列名称、长度和 FASTA 标题中的 accession。蛋白序列长度不同并不一定表示数据错误，后续的比对会显式处理插入和缺失。
+
+## 2. 人和金枪鱼：80.6% 到底是什么量？
+
+课堂上的 80.6% 是全长序列在局部比对中的 **identity**：对齐位置上完全相同的氨基酸比例。它不是“同源性的百分比”，也不是单独足以证明同源的结论。
 
 ```{r}
-pload(muscle)
+pload(pwalign)
 
-cybt_aln <- bs_aln(cybt)
-cybt_aln
+human_tuna <- pairwiseAlignment(
+  cytc[["Human"]], cytc[["Tuna"]],
+  substitutionMatrix = "BLOSUM62",
+  gapOpening = 10, gapExtension = 0.5,
+  type = "global"
+)
 
-# 保存比对结果
-aln_file <- "sylvia_cytb_aln.fasta"
-fa_write(cybt_aln, outfile = aln_file)
+data.frame(
+  score = score(human_tuna),
+  identity_percent = round(pid(human_tuna), 1),
+  aligned_length = nchar(as.character(alignedPattern(human_tuna)))
+)
 ```
-
-## 构建进化树
-
-NJ方法构建系统发育树，如果要使用ML方法，可以参考[这里](https://cran.r-project.org/web/packages/phangorn/vignettes/Trees.html)
 
 ```{r}
-pload(ape)
-sylvia_aln <- read.dna(aln_file, format = 'fasta')
-
-tree <- bionj(dist.dna(sylvia_aln, model = "K80"))
-tree
+cat("Human: ", as.character(alignedPattern(human_tuna)), "\\n", sep = "")
+cat("Tuna : ", as.character(alignedSubject(human_tuna)), "\\n", sep = "")
 ```
 
+**练习 1：**同时报告 `score`、`identity_percent` 和 `aligned_length`。只写“80.6%”而不写指标名称，别人无法判断你报告的是什么。
 
-## 进化树可视化
-
-### 简单树可视化
-```{r}
-pload(ggtree)
-ggtree(tree) + geom_tiplab() + hexpand(2)
-```
-
-### 添加bootstrap值
+## 3. 把人序列作为查询：局部比对结果
 
 ```{r}
-bp <- boot.phylo(tree, sylvia_aln, function(x) bionj(dist.dna(x)))
-bp
-
-pload(tidytree)
-pload(treeio)
-bp2 <- tibble(node = 1:Nnode(tree) + Ntip(tree), bootstrap = bp)
-tree2 <- full_join(tree, bp2, by = "node")
-tree2
+local_hits <- lapply(setdiff(names(cytc), "Human"), function(sp) {
+  hit <- pairwiseAlignment(
+    cytc[["Human"]], cytc[[sp]],
+    substitutionMatrix = "BLOSUM62",
+    gapOpening = 10, gapExtension = 0.5,
+    type = "local"
+  )
+  data.frame(
+    species = sp,
+    score = as.numeric(score(hit)),
+    identity_percent = round(as.numeric(pid(hit)), 1),
+    aligned_length = nchar(as.character(alignedPattern(hit)))
+  )
+}) |> bind_rows() |> arrange(desc(score))
+local_hits
 ```
 
-### 可视化带bootstrap值的进化树
+局部比对分数和 identity 随演化距离总体下降，但它们仍然是“线索”：打分矩阵、缺口惩罚、比对范围都会影响数值。下一步需要把多个物种放在同一个坐标系里比较。
+
+## 4. 多序列比对与保守位点
+
+实验目录附带 `cytc_msa.fasta`，由 `DECIPHER::AlignSeqs()` 对同一组真实序列计算得到。先使用预计算结果保证课堂可重复；如果想重算，可删除该文件后运行备用分支。
 
 ```{r}
-pload(ggplot2)
-pload(ggtree)
+msa_file <- "cytc_msa.fasta"
 
-ggtree(tree2) +
-    geom_tiplab(aes(
-        label = sub("\\S+\\s+(\\w+)\\s+(\\w+)\\s.*$", "\\1 \\2", label)
-    )) +
-    hexpand(.1) +
-    geom_nodepoint(aes(color = bootstrap), size = 4) +
-    scale_color_viridis_c() +
-    theme(legend.position = c(.9, .8))
+if (file.exists(msa_file)) {
+  message("使用目录中附带的预计算 MSA：", msa_file)
+  cytc_msa <- readAAStringSet(msa_file)
+} else {
+  pload(DECIPHER)
+  cytc_msa <- AlignSeqs(cytc, verbose = FALSE)
+  writeXStringSet(cytc_msa, filepath = msa_file)
+}
+
+cytc_msa
 ```
+
+```{r}
+msa_mat <- as.matrix(cytc_msa)
+conserved <- apply(msa_mat, 2, function(col) {
+  col <- col[col != "-"]
+  length(col) > 0 && length(unique(col)) == 1
+})
+
+data.frame(
+  aligned_columns = ncol(msa_mat),
+  conserved_columns = sum(conserved),
+  conserved_percent = round(100 * mean(conserved), 1)
+)
+```
+
+**练习 2：**比较“完全一致的列”和“含有保守替换的列”。完全一致不是唯一重要证据，功能相关位点的保守替换同样需要结合结构和生物学解释。
+
+## 5. 距离矩阵与 NJ 树
+
+这里先用原始 p-distance，即对齐后不同氨基酸位点的比例。模型校正是后续扩展，不把“观察差异”直接当成真实演化距离。
+
+```{r}
+pload(phangorn)
+phy_aln <- as.phyDat(cytc_msa, type = "AA")
+p_dist <- dist.hamming(phy_aln, ratio = TRUE)
+round(as.matrix(p_dist), 3)
+```
+
+```{r}
+tree_nj <- NJ(p_dist)
+tree_nj <- root(tree_nj, outgroup = "Yeast", resolve.root = TRUE)
+
+ggtree(tree_nj) +
+  geom_tiplab() +
+  ggtitle("NJ tree from amino-acid p-distance")
+```
+
+**练习 3：**先不看物种名称，只看拓扑，写出人、黑猩猩、小鼠和鸡的大致关系；再打开名称检查你的判断。树的拓扑是关系假设，不是自动生成的生物学结论。
+
+## 6. bootstrap：树对重采样是否稳定？
+
+```{r}
+set.seed(20261005)
+bs_trees <- bootstrap.phyDat(
+  phy_aln,
+  FUN = function(x) NJ(dist.hamming(x, ratio = TRUE)),
+  bs = 50
+)
+tree_nj_bs <- plotBS(tree_nj, bs_trees, p = 50, type = "none")
+tree_nj_bs$node.label
+```
+
+```{r}
+ggtree(tree_nj_bs) +
+  geom_tiplab() +
+  geom_text2(aes(subset = !isTip, label = label), hjust = -0.2) +
+  ggtitle("NJ tree with bootstrap support (50 replicates)")
+```
+
+50 次重采样适合课堂演示速度，不等于正式研究中的唯一标准。低支持度分支应被标记为不确定，而不是被解释成确定的物种关系。
+
+## 7. 扩展：用蛋白替换模型做 ML 树
+
+```{r}
+fit0 <- pml(tree_nj, phy_aln, model = "WAG")
+fit_ml <- optim.pml(
+  fit0, optNni = TRUE, optBf = TRUE,
+  optQ = FALSE, optInv = FALSE, optGamma = FALSE,
+  rearrangement = "NNI", control = pml.control(trace = 0)
+)
+tree_ml <- root(fit_ml$tree, outgroup = "Yeast", resolve.root = TRUE)
+
+cat("ML log-likelihood:", round(fit_ml$logLik, 2), "\\n")
+ggtree(tree_ml) +
+  geom_tiplab() +
+  ggtitle("ML tree under the WAG amino-acid model")
+```
+
+**练习 4：**把 NJ 和 ML 的拓扑并排比较：哪些分支一致，哪些分支改变？改变本身不是“谁对谁错”的证明，而是提醒我们：距离定义、替换模型和数据支持度都会影响树。
+
+## 8. 实验报告要求
+
+提交一页以内的结果报告，至少包含：
+
+1. Human–Tuna 的 score、identity 和比对长度；
+2. 8 物种 MSA 的长度与保守列比例；
+3. NJ 树及至少一个内部节点的 bootstrap 支持度；
+4. NJ 与 ML 的一处相同点和一处差异；
+5. 一段边界说明：为什么“identity 高”仍不能单独等同于“同源已证实”。
+
+本实验的判断链是：**identity 是观测量，MSA 提供可比坐标，树提出关系假设，bootstrap 和模型比较帮助我们表达不确定性。**
