@@ -18,41 +18,25 @@ date: "`r Sys.Date()`"
 
 - [R语言安装](../rlang/index.html)
 
+## 环境准备
+
+`yulab.utils::pload()` 会检查 R 包是否已安装；缺少时提示安装，安装后自动加载。
 
 ```{r}
-#| echo: false
-#| eval: false
-install.packages("BiocManager")
-
-core_pkg <- c(
-  "airway", "pheatmap", "DESeq2", "SummarizedExperiment",
-  "org.Hs.eg.db", "clusterProfiler", "enrichplot",
-  "ggplot2", "dplyr"
-)
-BiocManager::install(core_pkg)
-
-# 可选：只有复现扩展章节时才需要这些包
-optional_pkg <- c("glmpca", "tximeta", "AnnotationHub")
-BiocManager::install(optional_pkg)
-install.packages(c("fanyi", "ivolcano", "aplot"))
+library(yulab.utils)
+pload(airway)
+pload(pheatmap)
+pload(DESeq2)
+pload(SummarizedExperiment)
+pload(org.Hs.eg.db)
+pload(clusterProfiler)
+pload(enrichplot)
+pload(ggplot2)
+pload(dplyr)
 ```
 
-核心运行依赖为 `airway`、`DESeq2`、`SummarizedExperiment`、`org.Hs.eg.db`、`clusterProfiler`、`enrichplot`、`ggplot2`、`dplyr` 与 `pheatmap`。`glmpca`、`tximeta`、`AnnotationHub` 和翻译/交互扩展为可选包；未安装 `glmpca` 时，PCA 小节使用 DESeq2 的 `vst()` 备用路线。
+`glmpca`、`tximeta`、`AnnotationHub` 和翻译/交互扩展为可选包；未安装 `glmpca` 时，PCA 小节使用 DESeq2 的 `vst()` 备用路线。
 
-```{r}
-#| echo: false
-#| results: 'hide'
-#| message: false
-#| warning: false
-library(airway)
-library(SummarizedExperiment)
-library(org.Hs.eg.db)
-library(clusterProfiler)
-library(dplyr)
-# conflict_prefer("rowRanges", "MatrixGenerics")
-# conflict_prefer("slice", "dplyr")
-
-```
 
 ## 示例数据
 

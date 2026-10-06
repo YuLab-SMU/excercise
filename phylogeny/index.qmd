@@ -18,7 +18,12 @@ date: "`r Sys.Date()`"
 - 保守列、距离矩阵和 NJ 树；
 - bootstrap 支持度与 WAG 模型 ML 树比较。
 
-数据文件随实验提供，FASTA 标题保留 NCBI、UniProt 或 PDB accession。
+## 数据文件
+
+- [下载 8 物种原始序列（cytc_8species.fasta）](https://yulab-smu.top/excercise/phylogeny/cytc_8species.fasta)
+- [下载预计算多序列比对（cytc_msa.fasta）](https://yulab-smu.top/excercise/phylogeny/cytc_msa.fasta)
+
+FASTA 标题保留 NCBI、UniProt 或 PDB accession。
 
 ## 环境准备
 
