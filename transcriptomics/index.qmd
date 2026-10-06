@@ -14,7 +14,7 @@ date: "`r Sys.Date()`"
 
 
 
-实验基于R语言环境，安装R语言，可参考：
+## R 环境
 
 - [R语言安装](../rlang/index.html)
 
@@ -23,6 +23,9 @@ date: "`r Sys.Date()`"
 `yulab.utils::pload()` 会检查 R 包是否已安装；缺少时提示安装，安装后自动加载。
 
 ```{r}
+#| results: 'hide'
+#| message: false
+#| warning: false
 library(yulab.utils)
 pload(airway)
 pload(pheatmap)
