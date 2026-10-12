@@ -24,14 +24,14 @@ date: "`r Sys.Date()`"
 
 ## 练习目录
 
-| 练习 | 内容 | 建议顺序 |
-|---|---|---:|
-| [R 语言安装](rlang/index.html) | 安装 R、RStudio/Positron，以及 CRAN 和 Bioconductor 软件包 | 0 |
-| [R 语言与数据可视化](r-vis/index.html) | 数据结构、缺失值、数据整理、函数、`apply` 家族与 `ggplot2` | 1 |
-| [进阶练习：K-means 聚类](kmeans/index.html) | K-means 算法、肘部法则、PCA 降维聚类、结果稳定性检验 | 1+ |
-| [转录组分析](transcriptomics/index.html) | `SummarizedExperiment`、PCA、差异表达、富集分析与可视化 | 2 |
-| [蛋白质组与蛋白质分析](protein-analysis/index.html) | 蛋白序列、基本属性、互作网络、功能富集与质谱定量 | 3 |
-| [蛋白质结构建模](protein-structure-modeling/index.html) | 蛋白序列与结构模型的基础练习 | 4 |
-| [细胞色素 c：序列比对与系统发育分析](phylogeny/index.html) | 两两比对、多序列比对、距离矩阵、NJ 树与 ML 树 | 5 |
+| 练习 | 内容 |
+|---|---|
+| [R 语言安装](rlang/index.html) | 安装 R、RStudio/Positron，以及 CRAN 和 Bioconductor 软件包 |
+| [R 语言与数据可视化](r-vis/index.html) | 数据结构、缺失值、数据整理、函数、`apply` 家族与 `ggplot2` |
+| [进阶练习：K-means 聚类](kmeans/index.html) | K-means 算法、肘部法则、PCA 降维聚类、结果稳定性检验 |
+| [转录组分析](transcriptomics/index.html) | `SummarizedExperiment`、PCA、差异表达、富集分析与可视化 |
+| [蛋白质组与蛋白质分析](protein-analysis/index.html) | 蛋白序列、基本属性、互作网络、功能富集与质谱定量 |
+| [蛋白质结构建模](protein-structure-modeling/index.html) | 蛋白序列与结构模型的基础练习 |
+| [细胞色素 c：序列比对与系统发育分析](phylogeny/index.html) | 两两比对、多序列比对、距离矩阵、NJ 树与 ML 树 |
 
 各练习页面中的数据文件与代码位于对应子目录；渲染后的 HTML 页面也保存在对应目录中。
