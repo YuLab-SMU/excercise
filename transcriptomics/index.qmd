@@ -150,6 +150,26 @@ if (requireNamespace("glmpca", quietly = TRUE)) {
 ```
 
 
+### 样本相似性
+
+PCA 只把主要变异压到两个轴上，样本之间的整体相似性更适合用相关系数矩阵看：同一 `donor` 的两次处理应该比跨 `donor` 更接近，`condition` 的效应则应该在同一 `donor` 内部体现。这里用 `vst()` 之后的表达矩阵算 Pearson 相关（`vst` 让不同表达量级的基因可比，直接对 counts 求相关会被高表达基因主导）。
+
+```{r}
+pload(pheatmap)
+vsd <- vst(dds, blind = TRUE)
+sample_cor <- cor(assay(vsd))
+
+anno_col <- as.data.frame(colData(dds)[, c("donor", "condition")])
+pheatmap(sample_cor,
+         annotation_col = anno_col,
+         annotation_row = anno_col,
+         display_numbers = TRUE,
+         number_format = "%.3f",
+         main = "样本间相关性（vst 表达矩阵）")
+```
+
+读这张图的顺序：先看对角线上的 1，再看组内与组间的差别。如果某个样本与所有样本的相关都明显偏低，先回去查 QC 与建库记录，不要直接删（第 4 讲的样本审问一节讲的就是这件事）。
+
 ### 差异表达分析
 ```{r}
 dds <- DESeq(dds)
@@ -166,38 +186,19 @@ head(res_shrunk[, c("log2FoldChange", "lfcSE", "padj")])
 
 
 
+### MA 图
+
+MA 图把效应量与平均表达放在同一张图上：横轴是标准化后的平均计数，纵轴是 log2 fold change。它有两个用处——一是看效应量是否随表达量变化（低表达端通常更发散），二是直接看出 `lfcShrink()` 把低计数基因的夸张倍数压回了多少。左右并排画原始与收缩后的结果。
+
 ```{r}
-#| echo: false
-#| eval: false
-p1 = ggplot(as.data.frame(res), 
-        aes(log2FoldChange, -log10(pvalue), 
-        color=abs(log2FoldChange)> 2 & pvalue < 0.01)) + 
-    geom_point() + 
-    scale_color_manual(values=c("grey", 'firebrick')) + 
-    theme(legend.position='none')
-
-d = as.data.frame(res)
-p2=ggplot(d, aes(log2FoldChange)) + geom_density()
-
-p <- -log10(d$pvalue)
-pi <- pretty(p, 10)
-
-d2 = cut(p, pi) |> table() |> as.data.frame()
-
-p3 <- ggplot(d2, aes(Var1, Freq)) + geom_col() + 
-    theme_minimal() +
-    xlab("p value intervals") +
-    ylab("Frequency") + 
-    ggtitle("p value distribution") + coord_flip()
-
-
-p3 = ggplot(d, aes(-log10(pvalue))) + geom_density() + coord_flip()
-p4 = ggplot(d, aes(x=1, -log10(pvalue))) + geom_boxplot()
-p3
-pload(aplot)
-insert_top(p1, p2, height=.3) |> insert_right(p3, width=.3)
-summary(res)
+#| fig.width: 12
+#| fig.height: 5
+par(mfrow = c(1, 2))
+plotMA(res, alpha = 0.01, ylim = c(-6, 6), main = "原始 log2FC")
+plotMA(res_shrunk, alpha = 0.01, ylim = c(-6, 6), main = "lfcShrink 之后")
 ```
+
+注意 `plotMA()` 的灰色点是 `padj` 不显著、蓝色点是显著；`alpha` 只影响着色，不影响模型。也可以自己用 ggplot2 画同一个东西（横轴建议 `scale_x_log10()`），但要记得 MA 图的横轴是表达量、纵轴是效应量，和火山图（横轴效应量、纵轴显著性）正好换了轴。
 
 ### 火山图
 
@@ -242,7 +243,7 @@ ggplot(geneCounts, aes(condition, count)) +
 ### 差异基因热图
 
 ```{r}
-#| fig-show: 'hide'
+#| fig.show: 'hide'
 rlog_expr <- assay(rlog(dds))
 mat1 <- rlog_expr[order(res$padj)[1:20], ]
 
@@ -276,6 +277,8 @@ aplot::plot_list(p1, p2)
 
 ## 富集分析
 
+### ORA：先设阈值，再看名单
+
 ```{r}
 df$entrez <- mapIds(org.Hs.eg.db, 
                     keys = df$gene_id,
@@ -304,14 +307,66 @@ cnetplot(x, foldChange = fc)
 ```
 富集分析同时报告 `gene_set` 和 `universe`。`universe` 应代表本次实验中真正有机会被检测、注释并进入检验的基因集合；默认使用全基因组可能系统性放大富集显著性。正式报告还应记录注释包版本和数据库日期。
 
+### GSEA：不设阈值，用整张排序表
+
+ORA 必须先把基因切成"显著 / 不显著"，阈值一动结果就换一批；GSEA 换一个问法——把**全部**基因按效应量排成一张表，看某条通路的基因是不是挤在排序的两端。这样做的好处是那些单个变化不大、但方向一致的通路不会被阈值切掉。
+
+跑 GSEA 之前要先处理两件事：把 ENSEMBL 映射到 ENTREZ 并**去重**（一个 ENTREZ 只能出现一次，否则排序表不合法），以及按 log2 fold change 从大到小排序。
+
+```{r}
+gl <- df[!is.na(df$log2FoldChange) & !is.na(df$entrez), c("entrez", "log2FoldChange")]
+gl <- gl[order(-abs(gl$log2FoldChange)), ]
+gl <- gl[!duplicated(gl$entrez), ]
+geneList <- sort(setNames(gl$log2FoldChange, gl$entrez), decreasing = TRUE)
+length(geneList)
+head(geneList)
+```
+
+```{r}
+#| fig.width: 10
+#| fig.height: 7
+pload(enrichplot)
+gse <- gseGO(geneList = geneList,
+             OrgDb = org.Hs.eg.db,
+             keyType = "ENTREZID",
+             ont = "BP",
+             minGSSize = 10,
+             pvalueCutoff = 0.05)
+gse_df <- as.data.frame(gse)
+head(gse_df[, c("ID", "Description", "setSize", "NES", "p.adjust")])
+dotplot(gse, showCategory = 10, split = ".sign") + facet_grid(. ~ sign(NES))
+```
+
+`NES`（normalized enrichment score）的符号说明方向：正值表示这条通路的基因在排序表**前端**富集（在处理组里更高），负值相反。`setSize` 是通路大小，通路太小时结果不稳定，所以上面设了 `minGSSize`。
+
+```{r}
+#| fig.width: 10
+#| fig.height: 5
+top_id <- gse_df$ID[1]
+gseaplot2(gse, geneSetID = top_id, title = gse_df$Description[1])
+```
+
+最后是 leading edge——驱动这条通路信号的那批核心基因。它比整条通路更值得拿去解释：
+
+```{r}
+le <- strsplit(gse_df$core_enrichment[1], "/")[[1]]
+le_symbol <- mapIds(org.Hs.eg.db, keys = le, column = "SYMBOL",
+                    keytype = "ENTREZID", multiVals = "first")
+head(le_symbol, 20)
+```
+
+报告 GSEA 结果时必须一起写清：用的是哪张排序表（哪个统计量）、置换次数（`nPermSimple`，默认 1000）、`minGSSize` 与 `pvalueCutoff`、以及注释库版本。和 ORA 一样，GSEA 给的是假说，不是机制。
+
 ## 结果审计任务
 
 结果审计：
 
-1. 比较原始 `log2FoldChange` 与 `res_shrunk` 的效应量，挑一个低计数基因说明 shrinkage 为什么会改变排序；
-2. 在 PCA、MA 图、火山图和 top-gene 表中，至少指出一个“统计显著但效应量很小”或“效应量大但不显著”的基因；
+1. 比较原始 `log2FoldChange` 与 `res_shrunk` 的效应量：在 MA 图上挑一个低计数、收缩前后差别最大的基因，说明 shrinkage 为什么会改变它的排序；
+2. 在 PCA、样本相关热图、MA 图、火山图和 top-gene 表中，至少指出一个“统计显著但效应量很小”或“效应量大但不显著”的基因；
 3. 重新运行一次富集分析，把 `universe` 改成全基因组，记录结果变化并解释背景偏差；
-4. 在报告末尾写清 contrast、design formula、padj 阈值、lfcShrink 方法、注释版本和随机性/软件版本。
+4. 对比 ORA 与 GSEA 的结果：找出两条路线都支持的通路，以及只在其中一条里出现的通路，并解释它们为什么不一致；
+5. 取 GSEA 首条通路的 leading edge 基因，说明这批基因与 ORA 的基因名单重叠多少；
+6. 在报告末尾写清 contrast、design formula、padj 阈值、lfcShrink 方法、GSEA 的排序统计量与置换次数、注释版本和随机性/软件版本。
 
 
 ```{r}

@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Guangchuang Yu School of Basic Medical Sciences, Southern Medical University">
-<meta name="dcterms.date" content="2026-09-03">
+<meta name="dcterms.date" content="2026-10-12">
 
 <title>R语言安装</title>
 <style>
@@ -2230,7 +2230,7 @@ School of Basic Medical Sciences, Southern Medical University </p>
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">September 3, 2026</p>
+      <p class="date">October 12, 2026</p>
     </div>
   </div>
   
@@ -2253,6 +2253,7 @@ School of Basic Medical Sciences, Southern Medical University </p>
 <li><a href="https://posit.co/download/rstudio-desktop/" class="uri">https://posit.co/download/rstudio-desktop/</a></li>
 <li><a href="https://positron.posit.co/download.html" class="uri">https://positron.posit.co/download.html</a></li>
 </ul>
+<p>另外推荐 <a href="https://github.com/YuLab-SMU/Rho">Rho</a>，这是余光创团队开发的一个R语言AI工作台，详见<a href="https://mp.weixin.qq.com/s/X7tY3J9UPRPboGNbVDIWWQ">介绍文章</a>。</p>
 <p>设置R包镜像，以便快速安装R包。推荐使用华中科大镜像：</p>
 <div class="cell">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">repos =</span> <span class="fu">c</span>(<span class="at">CRAN =</span> <span class="st">&quot;https://mirrors.hust.edu.cn/CRAN/&quot;</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
@@ -2286,7 +2287,7 @@ School of Basic Medical Sciences, Southern Medical University </p>
 </div>
 <p>R镜像测速，可使用<a href="https://CRAN.R-project.org/package=mirrorselect">mirrorselect</a>包。</p>
 <p>安装<code>Rtools</code>:</p>
-<p>一些R软件包有搭配<code>C</code>、<code>C++</code>、<code>Fortran</code>等语言进行开发的情况下， <code>对于</code>Windows<code>与</code>Mac<code>系统，</code>CRAN<code>与</code>Bionductor<code>平台一般会提供已经编译好的安装包，但是在版本发布初期（</code>Bionductor<code>每半年一次，一般是5月与10月底左右）可能没有及时提供最新编译版本。这时候在</code>Windows<code>或者</code>Mac<code>系统下就可能需要</code>Rtools<code>软件进行本地编译安装相应的依赖包。（</code>Rtools<code>提供了</code>gcc<code>,</code>g++<code>,</code>make<code>等编译环境，且与R版本经常绑定, 即需要根据安装的</code>R<code>版本选择相应的</code>Rtools`版本进行安装）。</p>
+<p>一些R软件包有搭配<code>C</code>、<code>C++</code>、<code>Fortran</code>等语言进行开发的情况下，对于<code>Windows</code>与<code>Mac</code>系统，<code>CRAN</code>与<code>Bioconductor</code>平台一般会提供已经编译好的安装包，但是在版本发布初期（<code>Bioconductor</code>每半年一次，一般是5月与10月底左右）可能没有及时提供最新编译版本。这时候在<code>Windows</code>或者<code>Mac</code>系统下就可能需要<code>Rtools</code>软件进行本地编译安装相应的依赖包。（<code>Rtools</code>提供了<code>gcc</code>, <code>g++</code>, <code>make</code>等编译环境，且与R版本经常绑定, 即需要根据安装的<code>R</code>版本选择相应的<code>Rtools</code>版本进行安装）。</p>
 <p><code>Rtools</code>的命名与<code>R</code>主版本对应（<code>R 4.5</code>对应<code>Rtools45</code>，<code>R 4.6</code>对应<code>Rtools46</code>，以此类推）。可到 <a href="https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/" class="uri">https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/</a> 进入对应版本的子目录，在其中的<code>files/</code>文件夹下选择下载安装程序（以上均为<code>Windows</code>版本）。新版本<code>R</code>刚发布时，对应的<code>Rtools</code>可能尚未编译发布，可先安装仍提供<code>Rtools</code>的上一个<code>R</code>版本。</p>
 <p>对于<code>Linux</code>系统则不需要安装<code>Rtools</code>，因为其可以使用系统提供的编译环境进行编译安装。</p>
 

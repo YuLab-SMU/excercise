@@ -17,7 +17,7 @@ date: "`r Sys.Date()`"
 - [R语言安装](../rlang/index.html)
 
 
-本实验以一组与**DNA损伤应答**密切相关的蛋白为例，用R完成一条"**从蛋白序列 → 基本属性 → 相互作用网络 → 功能富集 → 质谱定量（拓展）**"的分析链，呼应课堂《蛋白质组与蛋白质分析》。涉及的蛋白：**p53 (TP53)、MDM2、BRCA1、BRCA2、ATM、CHK2、CDKN2A**。
+本实验以一组与**DNA损伤应答**相关的蛋白为例，用R完成一条"**从蛋白序列 → 基本属性 → 相互作用网络 → 功能富集 → 质谱定量（拓展）**"的分析链。涉及的蛋白：**p53 (TP53)、MDM2、BRCA1、BRCA2、ATM、CHK2、CDKN2A**。
 
 ```{r}
 #| echo: false
@@ -25,7 +25,8 @@ date: "`r Sys.Date()`"
 install.packages("BiocManager")
 
 pkg <- c("yulab.utils", "rentrez", "Biostrings", "Peptides",
-        "clusterProfiler", "org.Hs.eg.db", "enrichplot", "MSstats")
+        "clusterProfiler", "org.Hs.eg.db", "enrichplot", "MSstats",
+        "ggplot2", "igraph", "shadowtext", "ivolcano")
 
 BiocManager::install(pkg)
 
@@ -39,6 +40,7 @@ BiocManager::install(pkg)
 #| results: 'hide'
 #| message: false
 #| warning: false
+options(timeout = 600)   # BioGRID 文件较大，放宽 R 默认的 60s 下载超时
 library(yulab.utils)
 ```
 
@@ -59,13 +61,18 @@ acc <- c(TP53  = "NP_000537.3",
          CHEK2 = "NP_001005735.1",
          CDKN2A= "NP_000068.1")
 
-fa <- vapply(acc, function(a) entrez_fetch(db = "protein", id = a,
-                                           rettype = "fasta"),
-             character(1))
-cat(fa, sep = "", file = "proteins_ncbi.fasta")
+if (file.exists("proteins_ncbi.fasta")) {
+  message("proteins_ncbi.fasta 已存在，跳过 NCBI 下载")
+} else {
+  fa <- vapply(acc, function(a) entrez_fetch(db = "protein", id = a,
+                                             rettype = "fasta"),
+               character(1))
+  stopifnot(!any(nchar(fa) == 0))   # 任一条抓取失败就停下，避免错位
+  cat(fa, sep = "", file = "proteins_ncbi.fasta")
+}
 ```
 
-> 项目目录中另附了一份 `proteins.fasta`（来自 [UniProt](https://www.uniprot.org)）作为离线备份；若 NCBI 暂时不可用，可直接读它。
+> 项目目录里另附两份离线文件：`proteins_ncbi.fasta` 是按上面 7 个 RefSeq accession 下载好的序列（与在线路径完全一致，NCBI 暂时不可用时直接用它）；`proteins.fasta` 来自 [UniProt](https://www.uniprot.org)，注意它选的是各自数据库的**代表序列**，MDM2（491 aa）与 CHEK2（543 aa，isoform a）与 RefSeq（497 aa / 586 aa，isoform c）不同，长度、分子量、等电点都会差一点。
 
 ```{r}
 pload(Biostrings)
@@ -87,9 +94,9 @@ rownames(aa) <- names(seqs)
 round(aa[ , apply(aa, 2, function(x) sd(x) > 0)], 2)
 ```
 
-### 分子量与等电点（`Peptides`，权威计算）
+### 分子量与等电点（`Peptides`）
 
-用 `Peptides` 计算分子量与等电点，避免自己手写氨基酸质量表（`Peptides::mw()` 使用标准残基质量）。
+用 `Peptides` 计算分子量与等电点。`pI()` 默认 `pKscale = "EMBOSS"`；与 [ExPASy Compute pI/Mw](https://web.expasy.org/compute_pi/)（Bjellqvist 标度）对照时会差 0.2–0.5。
 
 ```{r}
 pload(Peptides)
@@ -107,42 +114,57 @@ res
 
 ## 二、蛋白相互作用网络（mechgraph + ggtangle）
 
-`mechgraph` 负责从数据库下载并构建"机制证据图"（`mechgraph` 对象，含节点/边表）；`ggtangle` 现在能**直接接收 `mechgraph` 对象**——`ggplot(mg)` 自动把节点/边转成网络图，边用 `geom_edge()`，节点 `size` 自动为度（degree）。
+`mechgraph` 从数据库下载并构建"机制证据图"（`mechgraph` 对象，含节点/边表）；`ggtangle` **直接接收 `mechgraph` 对象**——`ggplot(mg)` 自动把节点/边转成网络图，边用 `geom_edge()`，节点 `size` 自动为度（degree）。
 
-**用哪个数据库？** 两种都可：`mg_from_biogrid()` 取 **BioGRID**（数据小，约几十 MB；对这些 DNA 损伤基因连通性很好，实测 7 个基因同属 1 个连通分量）；`mg_from_string()` 取 **STRING**（更大，首次下载较多；解析时会去除重复边，图更干净）。
+> **数据文件**
+
+| 文件 | 说明 |
+| --- | --- |
+| [`proteins_ncbi.fasta`](proteins_ncbi.fasta) | 上表 7 个 RefSeq accession 的序列 |
+| [`proteins.fasta`](proteins.fasta) | 同 7 个蛋白的 [UniProt](https://www.uniprot.org) 代表序列；MDM2 491 aa、CHEK2 543 aa（isoform a），与 RefSeq（497 / 586 aa，isoform c）不同 |
+| [`BIOGRID-MV-Physical-LATEST.tab3.zip`](BIOGRID-MV-Physical-LATEST.tab3.zip) | BioGRID Multi-Validated **physical** 互作数据（35 MB 压缩 / 263 MB 解压），供 `mg_from_biogrid(file = ...)` 使用 |
+
+`mg_from_string()` 可改用 **STRING**（`keytype = "symbol"`, `score_threshold = 700`），该数据需在线下载。
 
 ### 用 mechgraph 下载网络 + 聚焦到我们的基因
 
 ```{r}
 pload(mechgraph)
-mg <- mg_from_biogrid(taxon_id = 9606, dataset = "mv_physical")
+mg <- mg_from_biogrid(file = "BIOGRID-MV-Physical-LATEST.tab3.zip",
+                      taxon_id = 9606, dataset = "mv_physical")
 mg
 ```
 
 ```{r}
 genes <- c("TP53", "MDM2", "BRCA1", "BRCA2", "ATM", "CHEK2", "CDKN2A")
-mg2 <- mg_induced_subgraph(mg, genes)
+nd <- mg_nodes(mg)
+ids <- nd$id[nd$label %in% genes]   # 节点 id 是 BIOGRID:xxxxx，基因名在 label 列
+mg2 <- mg_induced_subgraph(mg, ids)
 mg_nodes(mg2)
 mg_edges(mg2)
 ```
 
-> BioGRID 同一对蛋白之间常有多条"证据边"，画图前可先**只保留唯一蛋白对**，观察会更清晰：
-> `g <- igraph::graph_from_data_frame(unique(mg_edges(mg2)[, c("from","to")]), directed = FALSE)`
+> BioGRID 同一对蛋白之间常有多条"证据边"，还可能有反向重复对与自环，画图前可先化简，观察会更清晰：
+> `g <- igraph::simplify(igraph::graph_from_data_frame(mg_edges(mg2)[, c("from","to")], directed = FALSE))`
 
 ### 用 ggtangle 直接可视化 mechgraph
 
 ```{r}
 pload(ggtangle)
+pload(ggplot2)
+pload(shadowtext)
 ggplot(mg2, layout = "circular") +
     geom_edge(alpha = .4, color = "#9AA5B1") +
     geom_point(aes(size = size), color = "#0B4F6C", show.legend = FALSE) +
-    geom_label(aes(label = name), size = 3.5) +
-    theme_void()
+    geom_shadowtext(aes(label = name), color = "black",
+                    bg.color = "white", bg.r = 0.18, size = 3.5) +
+    theme_void() +
+    theme(plot.background = element_rect(fill = "white", color = NA))
 ```
 
 **思考**：图中最大的节点（度最高）是哪个蛋白？为何它在 DNA 损伤应答中如此核心？（这组基因在 BioGRID 中高度连通，TP53 是最核心的 hub。）
 
-> 需要具体的度数值时，可用 `mechgraph::as.igraph(mg2)` 把 `mechgraph` 转成 `igraph`（节点/边信息会作为 igraph 属性保留），再 `igraph::degree(g)`。若改用 STRING，只需把下载语句换成：`mg <- mg_from_string(taxon_id = 9606, keytype = "symbol", score_threshold = 700)`。
+> 需要具体的度数值时，可用 `igraph::as.igraph(mg2)` 把 `mechgraph` 转成 `igraph`（节点/边信息会作为 igraph 属性保留）。注意 BioGRID 的 physical 数据里**自相互作用**（同源二聚体）也是一条边，igraph 会把自环算作 2 度；算度数前先用 `g <- igraph::simplify(igraph::as.igraph(mg2), remove.multiple = TRUE, remove.loops = TRUE)`，再 `igraph::degree(g)`。若改用 STRING，只需把下载语句换成：`mg <- mg_from_string(taxon_id = 9606, keytype = "symbol", score_threshold = 700)`。
 
 ## 三、功能富集分析
 
@@ -176,8 +198,10 @@ cnetplot(x, showCategory = 5)
 
 ```{r}
 pload(MSstats)
-data(DDARawData)   # 内置示例：label-free DDA 刺入实验（6 蛋白 / 6 条件）
+data(DDARawData)   # 内置示例：label-free DDA 掺入（spike-in）实验，6 蛋白 / 6 条件（Mueller et al. 2007，latin square 设计）
 head(DDARawData)
+dim(DDARawData)
+table(DDARawData$ProteinName)
 ```
 
 ```{r}
@@ -185,7 +209,7 @@ processed <- dataProcess(DDARawData)   # 肽段→蛋白水平汇总
 names(processed)
 ```
 
-构造对比矩阵（比较 C6 与 C4，即"刺入高 vs 低"），做组间比较：
+构造对比矩阵（比较 C6 与 C4 两个条件；latin square 设计下各蛋白浓度走向不同，log2FC 有正有负）：
 
 ```{r}
 lv <- c("C1", "C2", "C3", "C4", "C5", "C6")
@@ -194,20 +218,34 @@ cm[1, "C4"] <- -1
 cm[1, "C6"] <- 1
 
 cmp <- groupComparison(contrast.matrix = cm, data = processed)
-res <- cmp$ComparisonResult   # 每蛋白的 log2FoldChange、p 值等
+res <- cmp$ComparisonResult   # 每蛋白的 log2FC、p 值等
 res
 ```
 
-火山图（用 `ggplot2` 画，x = log2FC，y = -log10(adj.pvalue)）：
+火山图只有 6 个点：`DDARawData` 本来就只有 6 个蛋白（每个 18–32 条肽、共 2070 行特征）。它是**受控掺入实验**——把已知浓度的蛋白掺进复杂背景，用来检验定量方法本身，不是用来找差异蛋白的发现型数据集。要看蛋白更多的火山图，需要换成真实的大规模定量数据（如 MaxQuant 的 `evidence.txt`）。
 
 ```{r}
 pload(ggplot2)
-ggplot(res, aes(log2FoldChange, -log10(adj.pvalue),
-                color = adj.pvalue < 0.05 & abs(log2FoldChange) > 1)) +
+ggplot(res, aes(log2FC, -log10(adj.pvalue),
+                color = adj.pvalue < 0.05 & abs(log2FC) > 1)) +
     geom_point(size = 3) +
     scale_color_manual(values = c("grey80", "firebrick")) +
     theme_minimal() +
     theme(legend.position = "none")
+```
+
+下面用 `ivolcano` 出交互式版本，鼠标悬停可看数值：
+
+```{r}
+pload(ivolcano)
+vdat <- data.frame(gene      = res$Protein,
+                   logFC     = res$log2FC,
+                   adj.P.Val = res$adj.pvalue,
+                   pvalue    = res$pvalue,
+                   SE        = res$SE)
+ivolcano(vdat, logFC_col = "logFC", pval_col = "adj.P.Val", gene_col = "gene",
+         title = "C6 vs C4 (MSstats, DDARawData)",
+         interactive = TRUE)
 ```
 
 > 实际的质谱数据可先用 `MaxQtoMSstatsFormat(evidence, annotation)` 将 MaxQuant 的 `evidence.txt` 转成 MSstats 格式，再走上面 `dataProcess()` + `groupComparison()` 流程。
@@ -216,6 +254,6 @@ ggplot(res, aes(log2FoldChange, -log10(adj.pvalue),
 
 ## 五、小结
 
-- **R 分析链**：序列下载（`rentrez`）→ 基本属性（`Biostrings`/`Peptides`）→ 互作网络（`mechgraph` 下载 + `ggtangle` 可视化）→ 功能富集（`clusterProfiler`）→ 定量（`MSstats`）。
-- **与课堂呼应**：把课堂上的 STRING、质谱定量、GO/KEGG 等工具真正跑了一遍。
-- 进一步可拓展：蛋白修饰位点分析、序列 Motif 检索、用 `mechgraph::as.igraph()` 把 `mechgraph` 交给别的 graph 工具进一步分析等。
+- **R 分析链**：序列下载（`rentrez`）→ 基本属性（`Biostrings`/`Peptides`）→ 互作网络（`mechgraph` + `ggtangle`）→ 功能富集（`clusterProfiler`）→ 定量（`MSstats`）。
+- 进一步可拓展：蛋白修饰位点分析、序列 Motif 检索、用 `igraph::as.igraph()` 把 `mechgraph` 交给别的 graph 工具进一步分析等。
+- **注意**：第 4 节的 `DDARawData` 每个条件只有 1 个生物学重复（3 个技术重复），MSstats 用技术重复估计误差，这里的 p 值**不能**当生物学显著性读。

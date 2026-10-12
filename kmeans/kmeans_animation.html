@@ -1,324 +1,172 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>K-means Algorithm Animation</title>
-  <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial; margin: 0; display: flex; height: 100vh; }
-    #left { width: 68%; background: #fafafa; display:flex; flex-direction:column; align-items:center; justify-content:center; }
-    #canvas-wrap { width: 90%; max-width:900px; background: white; border: 1px solid #ddd; padding: 12px; box-shadow: 0 6px 20px rgba(30,30,30,0.06); }
-    canvas { display:block; width:100%; height:600px; background: linear-gradient(180deg,#fff,#fcfcff); }
-    #right { width:32%; padding:18px; box-sizing:border-box; background:#fff; border-left:1px solid #eee; }
-    h1 { font-size:18px; margin:0 0 8px 0; }
-    .controls { margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    .control-row { margin-bottom:12px; }
-    label { font-size:13px; display:block; margin-bottom:6px; }
-    input[type=range] { width:100%; }
-    button { padding:8px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; }
-    button.primary { background:#2563eb; color:white; border-color:#2563eb; }
-    small.note { color:#666; }
-    .legend { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
-    .legend .item { display:flex; align-items:center; gap:6px; }
-    .dot { width:14px; height:14px; border-radius:50%; }
-    footer { margin-top:12px; font-size:12px; color:#666; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>K-means 迭代动画（iris 真实数据）</title>
+<style>
+  body { font-family:'PingFang SC','Microsoft YaHei','Noto Sans CJK SC',system-ui,sans-serif;
+         margin:0; display:flex; height:100vh; color:#1a1a1a; }
+  #left { width:66%; background:#fafafa; display:flex; align-items:center; justify-content:center; padding:12px; box-sizing:border-box; }
+  #wrap { width:100%; max-width:860px; background:#fff; border:1px solid #e2e2e2; border-radius:8px; padding:10px; }
+  canvas { display:block; width:100%; height:560px; }
+  #right { width:34%; padding:20px; box-sizing:border-box; background:#fff; border-left:1px solid #eee; overflow:auto; }
+  h1 { font-size:18px; margin:0 0 8px; }
+  h2 { font-size:14px; margin:18px 0 6px; color:#1f3a5f; }
+  p,li,label { font-size:13px; line-height:1.6; color:#333; }
+  .row { margin-bottom:12px; }
+  input[type=range] { width:100%; }
+  button { padding:7px 12px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; font-size:13px; margin:0 6px 6px 0; }
+  button.primary { background:#1f3a5f; color:#fff; border-color:#1f3a5f; }
+  .box { font-family:Consolas,Menlo,monospace; font-size:13px; background:#f4f6f9; border-radius:6px; padding:8px 10px; min-height:40px; }
+  .legend { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; font-size:12px; }
+  .legend .item { display:flex; align-items:center; gap:5px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  footer { margin-top:14px; font-size:12px; color:#666; }
+</style>
 </head>
 <body>
-  <div id="left">
-    <div id="canvas-wrap">
-      <canvas id="c"></canvas>
-    </div>
+<div id="left"><div id="wrap"><canvas id="c"></canvas></div></div>
+<div id="right">
+  <h1>K-means 迭代动画</h1>
+  <p>数据是 <code>iris</code> 的 <strong>Sepal.Length × Sepal.Width</strong> 两列（150 朵花、真实测量值）。物种标签默认隐藏：先看算法怎么分组，再打开标签看它把哪两群混在了一起。</p>
+  <div class="row">
+    <label>聚类数 k：<span id="kval">3</span></label>
+    <input id="k" type="range" min="1" max="6" value="3" />
   </div>
-  <div id="right">
-    <h1>K-means Algorithm — Interactive Animation</h1>
-    <p>可视化 K-means 算法的主要步骤：<br>- 随机初始化中心点（centroids）<br>- 将点分配到最近中心（assignment）<br>- 更新中心为簇内均值（update）<br>- 重复直到收敛</p>
-
-    <div class="control-row">
-      <label>Number of clusters (k): <span id="kval">3</span></label>
-      <input id="k" type="range" min="1" max="8" value="3" />
-    </div>
-
-    <div class="control-row">
-      <label>Number of points: <span id="nval">200</span></label>
-      <input id="n" type="range" min="20" max="800" value="200" />
-    </div>
-
-    <div class="controls">
-      <button id="play" class="primary">Play</button>
-      <button id="step">Step</button>
-      <button id="reset">Reset</button>
-      <button id="randomize">Randomize Points</button>
-    </div>
-
-    <div style="margin-top:10px">
-      <label>Animation speed (ms per step)</label>
-      <input id="speed" type="range" min="50" max="1500" value="500" />
-    </div>
-
-    <div class="legend" id="legend"></div>
-
-    <footer>
-      Tip: 拖动右侧控件改变 k 或样本数，按 <strong>Play</strong> 自动运行，按 <strong>Step</strong> 单步执行一次 assignment/update。
-    </footer>
+  <div class="row">
+    <button id="init" class="primary">① 随机初始化中心</button>
+    <button id="step">② 走一步</button>
+    <button id="run">自动迭代</button>
+    <button id="reset">重置</button>
   </div>
-
+  <div class="row"><label><input type="checkbox" id="showsp" /> 显示真实物种标签（金＝setosa，深蓝边＝versicolor，黑边＝virginica）</label></div>
+  <h2>当前状态</h2>
+  <div class="box" id="status">点「随机初始化中心」开始。</div>
+  <h2>组内平方和</h2>
+  <div class="box" id="wss">—</div>
+  <p style="color:#666;font-size:12px">每次「更新」之后组内平方和只会下降或不变。肘部法则画的就是这条曲线随 k 的变化，而每一个点都是这样一个数字。</p>
+  <div class="legend" id="legend"></div>
+  <footer>初始中心随机，所以同一个 k 每次跑出来可能不同——上机要求你用 <code>set.seed()</code> 固定后重跑三次，比较分组是否稳定。</footer>
+</div>
 <script>
-(() => {
-  const canvas = document.getElementById('c');
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  function resize() {
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = Math.floor(rect.width * dpr);
-    canvas.height = Math.floor(rect.height * dpr);
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-  }
-  window.addEventListener('resize', resize);
-  resize();
+const IRIS = {
+  sl: [5.1,4.9,4.7,4.6,5,5.4,4.6,5,4.4,4.9,5.4,4.8,4.8,4.3,5.8,5.7,5.4,5.1,5.7,5.1,5.4,5.1,4.6,5.1,4.8,5,5,5.2,5.2,4.7,4.8,5.4,5.2,5.5,4.9,5,5.5,4.9,4.4,5.1,5,4.5,4.4,5,5.1,4.8,5.1,4.6,5.3,5,7,6.4,6.9,5.5,6.5,5.7,6.3,4.9,6.6,5.2,5,5.9,6,6.1,5.6,6.7,5.6,5.8,6.2,5.6,5.9,6.1,6.3,6.1,6.4,6.6,6.8,6.7,6,5.7,5.5,5.5,5.8,6,5.4,6,6.7,6.3,5.6,5.5,5.5,6.1,5.8,5,5.6,5.7,5.7,6.2,5.1,5.7,6.3,5.8,7.1,6.3,6.5,7.6,4.9,7.3,6.7,7.2,6.5,6.4,6.8,5.7,5.8,6.4,6.5,7.7,7.7,6,6.9,5.6,7.7,6.3,6.7,7.2,6.2,6.1,6.4,7.2,7.4,7.9,6.4,6.3,6.1,7.7,6.3,6.4,6,6.9,6.7,6.9,5.8,6.8,6.7,6.7,6.3,6.5,6.2,5.9],
+    sw: [3.5,3,3.2,3.1,3.6,3.9,3.4,3.4,2.9,3.1,3.7,3.4,3,3,4,4.4,3.9,3.5,3.8,3.8,3.4,3.7,3.6,3.3,3.4,3,3.4,3.5,3.4,3.2,3.1,3.4,4.1,4.2,3.1,3.2,3.5,3.6,3,3.4,3.5,2.3,3.2,3.5,3.8,3,3.8,3.2,3.7,3.3,3.2,3.2,3.1,2.3,2.8,2.8,3.3,2.4,2.9,2.7,2,3,2.2,2.9,2.9,3.1,3,2.7,2.2,2.5,3.2,2.8,2.5,2.8,2.9,3,2.8,3,2.9,2.6,2.4,2.4,2.7,2.7,3,3.4,3.1,2.3,3,2.5,2.6,3,2.6,2.3,2.7,3,2.9,2.9,2.5,2.8,3.3,2.7,3,2.9,3,3,2.5,2.9,2.5,3.6,3.2,2.7,3,2.5,2.8,3.2,3,3.8,2.6,2.2,3.2,2.8,2.8,2.7,3.3,3.2,2.8,3,2.8,3,2.8,3.8,2.8,2.8,2.6,3,3.4,3.1,3,3.1,3.1,3.1,2.7,3.2,3.3,3,2.5,3,3.4,3],
+    sp: ["setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","setosa","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","versicolor","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica","virginica"]
+};
+const COLORS = ['#E07B39','#2A9D8F','#5B6FCF','#A06CD5','#D98B63','#20615E'];
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status'), wssEl = document.getElementById('wss');
+const kInput = document.getElementById('k'), kLabel = document.getElementById('kval');
+const showSp = document.getElementById('showsp');
+let pts = [], cents = [], assign = [], k = 3, phase = 'idle', iter = 0, timer = null;
+const PAD = 44;
 
-  // Controls
-  const kSlider = document.getElementById('k');
-  const kval = document.getElementById('kval');
-  const nSlider = document.getElementById('n');
-  const nval = document.getElementById('nval');
-  const playBtn = document.getElementById('play');
-  const stepBtn = document.getElementById('step');
-  const resetBtn = document.getElementById('reset');
-  const randBtn = document.getElementById('randomize');
-  const speedSlider = document.getElementById('speed');
-  const legendDiv = document.getElementById('legend');
+document.getElementById('legend').innerHTML = COLORS.map((c,i) =>
+  `<div class="item"><span class="dot" style="background:${c}"></span>簇 ${i+1}</div>`).join('')
+  + '<div class="item"><span class="dot" style="background:#111;border-radius:2px"></span>中心</div>';
 
-  let width = canvas.width / dpr - 20;
-  let height = canvas.height / dpr - 20;
-
-  // Data
-  function randomNormal(mu=0, sigma=1){
-    // Box-Muller
-    let u = 0, v = 0;
-    while(u === 0) u = Math.random();
-    while(v === 0) v = Math.random();
-    return mu + sigma * Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0*Math.PI*v);
-  }
-
-  function generatePoints(n){
-    const pts = [];
-    // create several gaussian blobs for nicer demo
-    const centers = [
-      {x:0.25*width, y:0.25*height},
-      {x:0.7*width, y:0.2*height},
-      {x:0.45*width, y:0.65*height},
-      {x:0.8*width, y:0.75*height},
-      {x:0.15*width, y:0.8*height}
-    ];
-    for(let i=0;i<n;i++){
-      // pick a blob
-      const b = Math.floor(Math.random()*centers.length);
-      const cx = centers[b].x + randomNormal(0, width*0.04);
-      const cy = centers[b].y + randomNormal(0, height*0.04);
-      pts.push({x:cx, y:cy, cluster: -1});
-    }
-    return pts;
-  }
-
-  function randColor(i){
-    const palette = ["#ef4444","#f97316","#f59e0b","#10b981","#3b82f6","#6366f1","#ec4899","#14b8a6"];
-    return palette[i % palette.length];
-  }
-
-  let points = generatePoints(parseInt(nSlider.value,10));
-  let k = parseInt(kSlider.value,10);
-  let centroids = [];
-  let animation = null;
-  let playing = false;
-  let stepPhase = 'assign'; // or 'update'
-
-  function initCentroids(){
-    centroids = [];
-    for(let i=0;i<k;i++){
-      // pick random point as initial centroid
-      const p = points[Math.floor(Math.random()*points.length)];
-      centroids.push({x:p.x + (Math.random()-0.5)*20, y:p.y + (Math.random()-0.5)*20, id:i});
-    }
-  }
-
-  function assignClusters(){
-    for(const p of points){
-      let best = -1, bestd = Infinity;
-      for(const c of centroids){
-        const dx = p.x - c.x, dy = p.y - c.y;
-        const d = dx*dx + dy*dy;
-        if(d < bestd){ bestd = d; best = c.id; }
-      }
-      p.cluster = best;
-    }
-  }
-
-  function updateCentroids(){
-    const sums = Array.from({length:k}, () => ({x:0,y:0,n:0}));
-    for(const p of points){
-      if(p.cluster >=0 && p.cluster < k){
-        sums[p.cluster].x += p.x;
-        sums[p.cluster].y += p.y;
-        sums[p.cluster].n += 1;
-      }
-    }
-    for(let i=0;i<k;i++){
-      if(sums[i].n>0){
-        // smooth movement: move centroid partway to new mean for nicer animation
-        const nx = sums[i].x / sums[i].n;
-        const ny = sums[i].y / sums[i].n;
-        centroids[i].nx = nx; centroids[i].ny = ny;
-      } else {
-        // if empty cluster, relocate randomly
-        centroids[i].nx = Math.random()*width; centroids[i].ny = Math.random()*height;
-      }
-    }
-  }
-
-  function stepOnce(){
-    if(stepPhase === 'assign'){
-      assignClusters();
-      stepPhase = 'update';
-    } else {
-      updateCentroids();
-      // animate centroid move to nx,ny
-      animateCentroidMove().then(()=>{
-        // finalize new positions
-        for(const c of centroids){ if(c.nx!==undefined) { c.x = c.nx; c.y = c.ny; delete c.nx; delete c.ny; } }
-      });
-      stepPhase = 'assign';
-    }
-    draw();
-  }
-
-  function animateCentroidMove(){
-    return new Promise((resolve)=>{
-      const duration = 400;
-      const start = performance.now();
-      const from = centroids.map(c=>({x:c.x,y:c.y}));
-      function frame(t){
-        const p = Math.min(1,(t-start)/duration);
-        const ease = 0.5 - Math.cos(Math.PI*p)/2; // ease in-out
-        for(let i=0;i<centroids.length;i++){
-          const c = centroids[i];
-          if(c.nx!==undefined){
-            c.x = from[i].x + (c.nx - from[i].x)*ease;
-            c.y = from[i].y + (c.ny - from[i].y)*ease;
-          }
-        }
-        draw();
-        if(p<1) requestAnimationFrame(frame);
-        else resolve();
-      }
-      requestAnimationFrame(frame);
-    });
-  }
-
-  function draw(){
-    // background
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    // margin
-    ctx.save(); ctx.translate(10,10);
-
-    // points
-    for(const p of points){
-      const col = p.cluster>=0 ? randColor(p.cluster) : '#999999';
-      ctx.beginPath(); ctx.fillStyle = col; ctx.globalAlpha = 0.9; ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill();
-    }
-
-    // centroids
-    for(let i=0;i<centroids.length;i++){
-      const c = centroids[i];
-      const col = randColor(i);
-      // halo
-      ctx.beginPath(); ctx.fillStyle = col; ctx.globalAlpha = 0.12; ctx.arc(c.x, c.y, 18, 0, Math.PI*2); ctx.fill();
-      // core
-      ctx.beginPath(); ctx.fillStyle = col; ctx.globalAlpha = 1; ctx.arc(c.x, c.y, 8, 0, Math.PI*2); ctx.fill();
-      // label
-      ctx.font = '12px system-ui'; ctx.fillStyle = '#111'; ctx.fillText('C'+(i+1), c.x+10, c.y-10);
-    }
-
-    ctx.restore();
-
-    // legend
-    updateLegend();
-  }
-
-  function updateLegend(){
-    legendDiv.innerHTML = '';
-    for(let i=0;i<k;i++){
-      const item = document.createElement('div'); item.className='item';
-      const dot = document.createElement('div'); dot.className='dot'; dot.style.background = randColor(i);
-      const txt = document.createElement('div'); txt.textContent = 'Cluster '+(i+1);
-      item.appendChild(dot); item.appendChild(txt);
-      legendDiv.appendChild(item);
-    }
-  }
-
-  function resetAll(){
-    k = parseInt(kSlider.value,10);
-    points = generatePoints(parseInt(nSlider.value,10));
-    initCentroids();
-    stepPhase = 'assign';
-    draw();
-  }
-
-  // animation loop: if playing, perform stepEvery ms
-  let intervalId = null;
-  function setPlaying(p){
-    playing = p;
-    playBtn.textContent = playing ? 'Pause' : 'Play';
-    playBtn.classList.toggle('primary', !playing?false:true);
-    if(playing){
-      const ms = parseInt(speedSlider.value,10);
-      intervalId = setInterval(()=>{ stepOnce(); }, Math.max(80, ms));
-    } else {
-      if(intervalId) { clearInterval(intervalId); intervalId = null; }
-    }
-  }
-
-  // init
-  resize();
-  k = parseInt(kSlider.value,10);
-  initCentroids();
+const dpr = () => window.devicePixelRatio || 1;
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = Math.floor(r.width * dpr());
+  canvas.height = Math.floor(r.height * dpr());
   draw();
+}
+window.addEventListener('resize', resize);
+const bounds = () => ({ x0: Math.min(...pts.map(p=>p.x)), x1: Math.max(...pts.map(p=>p.x)),
+                        y0: Math.min(...pts.map(p=>p.y)), y1: Math.max(...pts.map(p=>p.y)) });
+const sx = (v,b,w) => PAD + (v-b.x0)/(b.x1-b.x0)*(w-2*PAD);
+const sy = (v,b,h) => h-PAD - (v-b.y0)/(b.y1-b.y0)*(h-2*PAD);
 
-  // events
-  kSlider.addEventListener('input', ()=>{
-    kval.textContent = kSlider.value;
-    k = parseInt(kSlider.value,10);
-    // adjust centroids array length
-    initCentroids();
-    draw();
+function reset() {
+  clearInterval(timer); timer = null;
+  pts = IRIS.sl.map((v,i) => ({ x:v, y:IRIS.sw[i], sp:IRIS.sp[i] }));
+  cents = []; assign = new Array(pts.length).fill(-1); phase = 'idle'; iter = 0;
+  statusEl.textContent = '点「随机初始化中心」开始。'; wssEl.textContent = '—'; draw();
+}
+function initCents() {
+  const b = bounds(); cents = [];
+  for (let i = 0; i < k; i++) cents.push({ x: b.x0 + Math.random()*(b.x1-b.x0),
+                                           y: b.y0 + Math.random()*(b.y1-b.y0) });
+  assign = new Array(pts.length).fill(-1); phase = 'cents'; iter = 0;
+  statusEl.textContent = `已随机放置 ${k} 个中心。下一步：把每个点分给离它最近的中心。`;
+  wssEl.textContent = '—'; draw();
+}
+function assignStep() {
+  if (!cents.length) return;
+  let moved = 0;
+  assign = pts.map((p,i) => {
+    let best = 0, bestD = Infinity;
+    cents.forEach((c,j) => { const d = (p.x-c.x)**2 + (p.y-c.y)**2; if (d < bestD) { bestD = d; best = j; } });
+    if (assign[i] !== best) moved++;
+    return best;
   });
-  nSlider.addEventListener('input', ()=>{ nval.textContent = nSlider.value; });
-  nSlider.addEventListener('change', ()=>{ points = generatePoints(parseInt(nSlider.value,10)); initCentroids(); draw(); });
+  phase = 'assigned';
+  statusEl.textContent = `分配完成：每个点归到最近的中心，本轮有 ${moved} 个点换了归属。下一步：把中心移到各自簇的均值处。`;
+  draw();
+}
+function updateStep() {
+  if (phase !== 'assigned') return;
+  const s = cents.map(() => ({ x:0, y:0, n:0 }));
+  pts.forEach((p,i) => { const a = assign[i]; if (a >= 0) { s[a].x += p.x; s[a].y += p.y; s[a].n++; } });
+  cents = s.map((v,j) => v.n ? { x:v.x/v.n, y:v.y/v.n } : cents[j]);
+  iter++;
+  const wss = pts.reduce((acc,p,i) => { const c = cents[assign[i]];
+    return acc + (p.x-c.x)**2 + (p.y-c.y)**2; }, 0);
+  phase = 'updated';
+  statusEl.textContent = `第 ${iter} 次更新完成：中心移到了簇内均值。再走一步会重新分配。`;
+  wssEl.textContent = `组内平方和 = ${wss.toFixed(2)}（第 ${iter} 次更新后）`;
+  draw();
+}
+const step = () => { if (phase === 'idle' || phase === 'cents') assignStep();
+                     else if (phase === 'assigned') updateStep(); else assignStep(); };
 
-  playBtn.addEventListener('click', ()=>{
-    setPlaying(!playing);
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,W,H); ctx.scale(dpr(), dpr());
+  const w = W/dpr(), h = H/dpr();
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,w,h);
+  if (!pts.length) return;
+  const b = bounds();
+  ctx.strokeStyle = '#cfd8e3'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD, h-PAD); ctx.lineTo(w-PAD, h-PAD);
+  ctx.moveTo(PAD, PAD); ctx.lineTo(PAD, h-PAD); ctx.stroke();
+  ctx.fillStyle = '#6b7280'; ctx.font = '12px system-ui';
+  ctx.fillText('Sepal.Length →', w-PAD-96, h-PAD+26);
+  ctx.save(); ctx.translate(14, PAD+110); ctx.rotate(-Math.PI/2); ctx.fillText('Sepal.Width →', 0, 0); ctx.restore();
+  ctx.fillText(b.x0.toFixed(1), PAD-6, h-PAD+16);
+  ctx.fillText(b.x1.toFixed(1), w-PAD-20, h-PAD+16);
+  pts.forEach((p,i) => {
+    const a = assign[i];
+    ctx.beginPath();
+    ctx.fillStyle = (showSp.checked && p.sp === 'setosa') ? '#E8C05B'
+                  : (a >= 0 ? COLORS[a % COLORS.length] : '#b8c4d4');
+    ctx.arc(sx(p.x,b,w), sy(p.y,b,h), 4, 0, Math.PI*2); ctx.fill();
+    if (showSp.checked && p.sp !== 'setosa') {
+      ctx.strokeStyle = p.sp === 'versicolor' ? '#1f3a5f' : '#111';
+      ctx.lineWidth = 1.2; ctx.stroke();
+    }
   });
-  stepBtn.addEventListener('click', ()=>{ stepOnce(); });
-  resetBtn.addEventListener('click', ()=>{ points = generatePoints(parseInt(nSlider.value,10)); initCentroids(); draw(); });
-  randBtn.addEventListener('click', ()=>{ points = generatePoints(parseInt(nSlider.value,10)); draw(); });
-
-  // allow clicking to add points
-  canvas.addEventListener('click', (e)=>{
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left - 10);
-    const y = (e.clientY - rect.top - 10);
-    points.push({x:x,y:y,cluster:-1});
-    draw();
+  cents.forEach((c,j) => {
+    const X = sx(c.x,b,w), Y = sy(c.y,b,h);
+    ctx.fillStyle = '#111'; ctx.fillRect(X-7, Y-7, 14, 14);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 10px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText(String(j+1), X, Y+4); ctx.textAlign = 'start';
   });
-
-  // keyboard
-  window.addEventListener('keydown',(e)=>{
-    if(e.key === ' ') { e.preventDefault(); setPlaying(!playing); }
-    if(e.key === 'r') { points = generatePoints(parseInt(nSlider.value,10)); initCentroids(); draw(); }
-    if(e.key === 's') { stepOnce(); }
-  });
-
-})();
+}
+kInput.addEventListener('input', e => { k = +e.target.value; kLabel.textContent = k; reset(); });
+document.getElementById('init').addEventListener('click', initCents);
+document.getElementById('step').addEventListener('click', step);
+document.getElementById('reset').addEventListener('click', reset);
+document.getElementById('run').addEventListener('click', () => {
+  clearInterval(timer);
+  timer = setInterval(() => { if (phase === 'idle') { clearInterval(timer); return; } step(); }, 700);
+});
+showSp.addEventListener('change', draw);
+reset(); resize();
 </script>
 </body>
 </html>

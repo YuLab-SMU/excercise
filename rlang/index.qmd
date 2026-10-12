@@ -43,6 +43,8 @@ if ("warning" %in% names(r_info)) {
 - <https://posit.co/download/rstudio-desktop/>
 - <https://positron.posit.co/download.html>
 
+另外推荐 [Rho](https://github.com/YuLab-SMU/Rho)，这是余光创团队开发的一个R语言AI工作台，详见[介绍文章](https://mp.weixin.qq.com/s/X7tY3J9UPRPboGNbVDIWWQ)。
+
 设置R包镜像，以便快速安装R包。推荐使用华中科大镜像：
 
 ```{r eval= FALSE}
@@ -90,7 +92,7 @@ R镜像测速，可使用`r yulab.utils::CRANpkg("mirrorselect")`包。
 
 安装`Rtools`:
 
-一些R软件包有搭配`C`、`C++`、`Fortran`等语言进行开发的情况下， `对于`Windows`与`Mac`系统，`CRAN`与`Bionductor`平台一般会提供已经编译好的安装包，但是在版本发布初期（`Bionductor`每半年一次，一般是5月与10月底左右）可能没有及时提供最新编译版本。这时候在`Windows`或者`Mac`系统下就可能需要`Rtools`软件进行本地编译安装相应的依赖包。（`Rtools`提供了`gcc`, `g++`, `make`等编译环境，且与R版本经常绑定, 即需要根据安装的`R`版本选择相应的`Rtools`版本进行安装）。
+一些R软件包有搭配`C`、`C++`、`Fortran`等语言进行开发的情况下，对于`Windows`与`Mac`系统，`CRAN`与`Bioconductor`平台一般会提供已经编译好的安装包，但是在版本发布初期（`Bioconductor`每半年一次，一般是5月与10月底左右）可能没有及时提供最新编译版本。这时候在`Windows`或者`Mac`系统下就可能需要`Rtools`软件进行本地编译安装相应的依赖包。（`Rtools`提供了`gcc`, `g++`, `make`等编译环境，且与R版本经常绑定, 即需要根据安装的`R`版本选择相应的`Rtools`版本进行安装）。
 
 `Rtools`的命名与`R`主版本对应（`R 4.5`对应`Rtools45`，`R 4.6`对应`Rtools46`，以此类推）。可到 <https://mirrors.hust.edu.cn/CRAN/bin/windows/Rtools/> 进入对应版本的子目录，在其中的`files/`文件夹下选择下载安装程序（以上均为`Windows`版本）。新版本`R`刚发布时，对应的`Rtools`可能尚未编译发布，可先安装仍提供`Rtools`的上一个`R`版本。
 

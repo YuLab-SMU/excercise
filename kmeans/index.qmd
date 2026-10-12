@@ -1,6 +1,6 @@
-
 ---
-title: "K-means Clustering Algorithm"
+title: "进阶练习：K-means 聚类"
+subtitle: "第一次上机的选做进阶内容"
 format: 
     html:
         embed-resources: true
@@ -12,44 +12,203 @@ author: "Guangchuang Yu\\
 date: "`r Sys.Date()`"
 ---
 
-## 算法步骤
+::: {.callout-note}
+## 这份材料的位置
+第一次上机的主线是 [R 语言与数据可视化](../r-vis/index.html)：认识数据结构、取子集、用管道汇总、把图按图形语法画出来。**这里做的是它的进阶部分**——把"哪些样本像哪些样本"这件事交给算法，而不是靠你手上的分组标签。
 
-1. 选择聚类数 𝑘
-2. 随机选择 k 个初始中心
-3. 将每个样本分配到最近的中心
-4. 更新中心点（取各簇均值）
-5. 重复直到收敛
+做之前请先完成 r-vis 的第 1–6 节；本页用到的 `apply` 家族、管道、`ggplot2` 与 PCA 都在那边练过（那边用的是 `airquality`/`mpg`，本页换成 `iris`——**同一套技能，换一份数据**）。
+:::
 
+K-means 要回答的是：**没有标签的时候，数据能不能自己站队？** 这正是第 5 讲单细胞聚类的思想雏形——那边换成了 Louvain 社区发现，但"先定分组数、再看结果稳不稳"的麻烦是一样的。
 
+用到的数据是 `iris` 的前四列（150 朵花的四个形态测量），物种标签放在一边，只当"标准答案"，用来检查算法做得怎么样。
 
 ```{r}
-# 示例数据
-set.seed(123)
-data <- iris[, -5]  # 去掉标签列
+#| message: false
+#| warning: false
+library(yulab.utils)
+pload(ggplot2)
+pload(dplyr)
+pload(tidyr)
 
-## k-means聚类
-km_res <- kmeans(data, centers = 3, nstart = 25)
-
-## 查看结果
-print(km_res)
-table(iris$Species, km_res$cluster)
-
-## 可视化
-library(ggplot2)
-data$cluster <- as.factor(km_res$cluster)
-ggplot(data, aes(x = Sepal.Length, y = Sepal.Width, color = cluster)) +
-  geom_point(size = 3) +
-  theme_minimal()
-
-## k值选择（肘部法则）
-wss <- sapply(1:10, function(k){
-  kmeans(data, centers = k, nstart = 10)$tot.withinss
-})
-plot(1:10, wss, type="b", pch=19, frame=FALSE,
-     xlab="Number of clusters K",
-     ylab="Total within-clusters sum of squares")
+data(iris)
+d <- iris[, 1:4]          # 只用测量值，先把 Species 放到一边
+head(d)
+table(iris$Species)
 ```
 
-## 交互动画
+## 1 算法步骤
 
-- [kmeans_animation](kmeans_animation.html)
+1. 选择聚类数 $k$
+2. 随机选择 $k$ 个初始中心
+3. 把每个样本分配给最近的中心
+4. 把中心更新为各簇的均值
+5. 重复 3–4 直到不再变化（或达到迭代上限）
+
+第 2 步是"随机"的，所以**同一个 $k$ 跑两次结果可能不同**。这是 K-means 最实际的一个坑，`set.seed()` 与 `nstart` 都是为了对付它。
+
+```{r}
+#| message: false
+set.seed(123)
+km <- kmeans(d, centers = 3, nstart = 25)
+km
+```
+
+`nstart = 25` 的意思是"用 25 组不同的随机初始中心各跑一遍，留下组内平方和最小的那次"。它不改变算法，只是让结果别太看运气。
+
+## 2 和真实物种对一对
+
+```{r}
+table(真实物种 = iris$Species, 聚类 = km$cluster)
+```
+
+setosa 那一行干干净净地落进同一簇；**versicolor 与 virginica 被切开了**。原因在数据本身：这两个物种在萼片长度与宽度上大量重叠，K-means 只能按"离中心最近"来分，分不开它们。这不是代码写错了，是**方法的前提与数据结构不匹配**——第 2 讲那句"图选错了不是不美观，是信息被丢掉了"，在这里就是"方法选错了不是不准，是问题本身没被回答"。
+
+## 3 画出来看
+
+```{r}
+#| fig.width: 9
+#| fig.height: 4.5
+clust <- d
+clust$cluster <- factor(km$cluster)
+clust$species <- iris$Species
+
+p1 <- ggplot(clust, aes(Sepal.Length, Sepal.Width, color = cluster)) +
+    geom_point(size = 2.5) +
+    labs(title = "K-means 给出的三簇", color = "簇") +
+    theme_minimal()
+
+p2 <- ggplot(clust, aes(Sepal.Length, Sepal.Width, color = species)) +
+    geom_point(size = 2.5) +
+    labs(title = "真实的三个物种", color = "物种") +
+    theme_minimal()
+
+aplot::plot_list(p1, p2, ncol = 2)
+```
+
+左边是算法看到的，右边是事实。两张图用**同一份数据、同一套映射**，只换了颜色那一列——这就是图形语法讲过的"数据与映射分开写"的用处：换一个变量看同一批数据，成本是一行代码。
+
+::: {.callout-tip}
+## 动手
+在左边的图上叠加中心点（`geom_point(data = 中心坐标, shape = 4, size = 4)`），中心坐标可以从 `km$centers` 取。做完再回答：中心点落在哪个位置，才能把 versicolor 和 virginica 分开？
+:::
+
+## 4 肘部法则：$k$ 怎么定
+
+组内平方和（WSS, within-cluster sum of squares）随 $k$ 增大只会下降——$k$ 等于样本数时它一定是 0。所以"WSS 最小"这个标准没用，要找的是**曲线拐弯的地方**（肘部）。
+
+```{r}
+#| fig.width: 8
+#| fig.height: 4.5
+set.seed(123)
+wss <- sapply(1:10, function(k) kmeans(d, centers = k, nstart = 25)$tot.withinss)
+
+ggplot(data.frame(k = 1:10, wss = wss), aes(k, wss)) +
+    geom_line(color = "steelblue") +
+    geom_point(size = 3, color = "steelblue") +
+    scale_x_continuous(breaks = 1:10) +
+    labs(x = "聚类数 k", y = "组内平方和（WSS）",
+         title = "肘部法则：拐点之后，加 k 换来的收益越来越小") +
+    theme_minimal()
+```
+
+```{r}
+round(wss, 2)
+wss[1] - wss[2]      # k=1 → 2 的下降
+wss[2] - wss[3]      # k=2 → 3 的下降
+wss[3] - wss[4]      # k=3 → 4 的下降
+```
+
+::: {.callout-warning}
+## 这里有一个真实发生过的错误
+如果先把聚类结果写回数据框、再拿去算肘部曲线，比如：
+
+```r
+# 错误示范：不要这样做
+d2 <- d
+d2$cluster <- as.factor(km$cluster)   # 多了一列因子
+wss_bad <- sapply(1:10, function(k) kmeans(d2, centers = k, nstart = 25)$tot.withinss)
+```
+
+`d2` 比 `d` 多了一列 `cluster`。因子在 `kmeans()` 里会被当成整数参与距离计算，于是：
+
+- $k=1$ 时的组内平方和从 **681.37** 变成 **768.41**（我在这里用 `set.seed(123)` 复算过；具体数字随随机种子变化，但一定偏大）；
+- **它不会报错**。唯一的问题是曲线整体被抬高，而"拐点在哪"这个判断会跟着漂。
+
+这类错误比语法错误危险得多：语法错了你会改，数字错了你不会。**第一件事永远是 `str(d)` 或 `dim(d)`，确认喂给算法的到底是哪几列。**
+:::
+
+::: {.callout-tip}
+## 动手
+1. 跑一遍上面的"错误示范"，把两条曲线画在同一张图上（`geom_line()` 两次，或把两个向量 `pivot_longer()` 之后分面），并解释差在哪。
+2. 换一个随机种子（`set.seed(1)`、`set.seed(2024)`）各算一次 $k=3$ 的聚类，比较分组是否一致（提示：`table()` 两次结果）。
+:::
+
+## 5 换一个视角：先降维再聚类
+
+`iris` 只有四列，可以直接聚类；但真实数据动辄几百上千列，距离会被大量噪声维度主导。常见做法是先做 PCA 降维再聚类。
+
+```{r}
+#| fig.width: 9
+#| fig.height: 4.5
+pca <- prcomp(d, scale. = TRUE)
+pc <- as.data.frame(pca$x[, 1:2])
+var_pct <- round(100 * pca$sdev^2 / sum(pca$sdev^2), 1)
+
+set.seed(123)
+km_pc <- kmeans(pc, centers = 3, nstart = 25)
+pc$cluster <- factor(km_pc$cluster)
+pc$species <- iris$Species
+
+g1 <- ggplot(pc, aes(PC1, PC2, color = cluster)) + geom_point(size = 2.5) +
+    labs(title = "在 PC1–PC2 上聚类", color = "簇",
+         x = paste0("PC1 (", var_pct[1], "%)"), y = paste0("PC2 (", var_pct[2], "%)")) +
+    theme_minimal()
+g2 <- ggplot(pc, aes(PC1, PC2, color = species)) + geom_point(size = 2.5) +
+    labs(title = "真实物种", color = "物种",
+         x = paste0("PC1 (", var_pct[1], "%)"), y = paste0("PC2 (", var_pct[2], "%)")) +
+    theme_minimal()
+
+aplot::plot_list(g1, g2, ncol = 2)
+```
+
+```{r}
+table(真实物种 = iris$Species, 降维后聚类 = km_pc$cluster)
+```
+
+前两个主成分解释了绝大部分形态差异，setosa 与另外两个物种被彻底分开。**但 versicolor 与 virginica 仍然重叠**——降维能让结构看得见，不能把不存在于这四列测量里的差异变出来。
+
+## 6 稳定性：结果能重来吗
+
+```{r}
+#| message: false
+stability <- lapply(1:3, function(s) {
+    set.seed(s)
+    kmeans(d, centers = 3, nstart = 1)$cluster   # 故意只用 1 组初始中心
+})
+sapply(stability, function(x) length(unique(x)))
+table(聚类1 = stability[[1]], 聚类2 = stability[[2]])
+```
+
+用一个随机初始中心跑三次，分组并不完全一致；把 `nstart` 提到 25，结果才开始稳定。**"换一次随机种子结果就变"本身就是结论的一部分**，报告里要写出来。
+
+::: {.callout-tip}
+## 动手
+1. 把 `nstart` 依次设为 1、5、25、50，各跑 3 次，统计三次结果中同一朵花被分到同一簇的比例。
+2. 画一条 `nstart` 与"三次结果一致率"的曲线，说明你从哪一个值开始认为结果稳定了。
+:::
+
+## 7 交互动画
+
+[kmeans 迭代动画](kmeans_animation.html)：在 iris 的萼片长度 × 宽度平面上逐个样本走一遍"分配 → 更新"。里面能看到三件事：
+
+- 中心的移动轨迹，以及**每次更新后组内平方和只会下降**；
+- 初始中心不同，最后落到不同局部最优；
+- 打开物种标签后，setosa 与另外两群分得很开，而 versicolor 与 virginica 混在一起——和上面第 2 节 `table()` 的结论完全一致。
+
+## 8 小结
+
+- K-means 是**无监督**方法：它不知道 `Species` 这一列，所以你也不能用"准确率"来评价它；
+- $k$ 要自己定，肘部法则是经验判据，不是定理；
+- 结果依赖随机初始，`set.seed()` 与 `nstart` 是必写项；
+- **喂进去的数据决定它能看到什么**：多一列因子会让曲线整体偏移且不报错；先降维能去噪声，但变不出不存在的差异。

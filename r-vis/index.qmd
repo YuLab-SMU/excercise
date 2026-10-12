@@ -1,0 +1,444 @@
+---
+title: "R 语言与数据可视化"
+subtitle: "第一次上机 · 配套第 1–2 讲"
+format: 
+    html:
+        embed-resources: true
+        fontsize: 1.1em
+        linestretch: 1.7
+        toc: true
+author: "Guangchuang Yu\\
+
+        School of Basic Medical Sciences, Southern Medical University"
+date: "`r Sys.Date()`"
+---
+
+```{r setup}
+#| include: false
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+这次上机把第 1 讲（R 语言）和第 2 讲（数据可视化）串成一条线：**看清数据长什么样 → 整理成能算的形状 → 算出想要的数 → 画成能读的图 → 写成一份能重跑的报告**。
+
+数据用的是 base R 自带的 **`airquality`**（1973 年纽约的空气质量日观测）和 ggplot2 自带的 **`mpg`**（汽车油耗）：类型与缺失值、取子集、管道与汇总、函数与迭代、图形语法、四类常用图、组合图、报告。
+
+::: {.callout-note}
+## 交付物
+一份用 Quarto 渲染出的 HTML 报告（第 1 讲 Part 06 讲的就是它），包含：
+1. 每个练习的代码块与输出；
+2. 每个练习下面用一两句话写清"我算出了什么、怎么判断它对不对"；
+3. 最后一段"我改了哪里"：写清你改动的参数、以及改动带来的图或数字变化。
+:::
+
+## 0 环境与数据
+
+第一次上机先确认三件事：R 能跑、包能装、数据能读。`yulab.utils::pload()` 检查包是否已安装，缺什么装什么，装好后自动加载。
+
+```{r}
+#| message: false
+#| warning: false
+library(yulab.utils)
+pload(ggplot2)
+pload(dplyr)
+pload(tidyr)
+pload(pheatmap)
+pload(aplot)
+pload(ggplotify)
+
+R.version.string
+packageVersion("ggplot2")
+```
+
+```{r}
+data(airquality)
+dim(airquality)
+head(airquality)
+```
+
+**第 1 讲讲"先认清对象是什么，再决定怎么动它"，第一件事就是看每一列的类型。**
+
+```{r}
+str(airquality)
+sapply(airquality, class)
+```
+
+`Month` 看起来像分组变量，但在数据里是**整数**（5、6、7、8、9），不是因子。这一点在画图时会变成一个真实的坑，第 4 节会撞上它。
+
+::: {.callout-tip}
+## 练习 0
+1. 这份数据有多少行、多少列？六列分别是什么类型？
+2. 哪几列有缺失值？各有几个？`colSums(is.na(airquality))` 一句就能看出来。
+3. `Month` 是整数还是因子？如果直接拿它上色，ggplot2 会怎么处理？
+:::
+
+## 1 类型、缺失值与取子集
+
+### 1.1 三种基本类型
+
+```{r}
+c(1, 2.5, NA)              # 数值向量
+c("May", "June", NA)       # 字符向量
+airquality$Ozone > 100     # 逻辑向量
+sum(airquality$Ozone > 100, na.rm = TRUE)   # 有多少天的臭氧超过 100
+```
+
+### 1.2 缺失值：NA、NULL、NaN 不是一回事
+
+第 1 讲专门用两页讲这三个"空"。在真实数据上跑一遍最直观：
+
+```{r}
+x <- c(1, 2, NA, 4)
+mean(x)                    # 默认返回 NA
+mean(x, na.rm = TRUE)      # 去掉缺失再算
+is.na(x)
+anyNA(x)
+
+length(NULL)               # NULL 是"没有对象"，长度是 0
+NaN + 1                    # NaN 是"算不出来"，但它还是一个数值
+```
+
+**一个缺失值会污染整个统计量**，这是 `airquality` 里最常见的一类错误来源：
+
+```{r}
+colSums(is.na(airquality))
+nrow(airquality)
+aq <- na.omit(airquality)  # 完整观测：行列都完整的那些天
+nrow(aq)
+```
+
+153 天里有 44 天至少缺一个测量值，`na.omit()` 之后只剩 111 天。删除前要么确认缺失与要研究的问题无关，要么换一个能处理缺失的方法。第 4 讲讲差异表达时会遇到同一类判断。
+
+### 1.3 取子集：`[]` 的四种用法
+
+```{r}
+airquality[1:5, 1:3]                       # 行、列都指定 → 数据框
+airquality[, "Ozone"] |> head(3)           # 只给列 → 向量
+airquality[1, ] |> str()                   # 只给行 → 一行数据框
+airquality$Temp |> head(3)                 # $ 取一列
+airquality[["Temp"]] |> head(3)            # [[]] 也取一列
+```
+
+用逻辑条件筛行是最常用的一种：
+
+```{r}
+hot <- airquality[airquality$Temp > 90, ]
+nrow(hot)
+table(hot$Month)
+```
+
+::: {.callout-tip}
+## 练习 1
+1. 取 6 月的全部观测，报告行数；再取"6 月且臭氧大于 100"的观测，报告行数。
+2. `airquality[airquality$Ozone > 100, "Temp"]` 返回什么？其中有没有 NA？为什么？
+3. 用 `complete.cases()` 找出完整观测的行，它的结果和 `na.omit()` 一致吗？
+4. 用 `write.csv()` 把 `hot` 写成 `hot_days.csv`，再用 `read.csv()` 读回来，比较两个数据框是否相同（提示：`all.equal()`）。
+:::
+
+## 2 把宽表整理成能算的形状
+
+第 1 讲 Part 04 的管道与 Part 05 的读写，在这里落到一个真实的整理任务上：**把"一行一天、四列测量值"的宽表，变成"一行一个观测"的长表**，再按月份汇总。
+
+```{r}
+long <- airquality |>
+    pivot_longer(cols = c(Ozone, Solar.R, Wind, Temp),
+                 names_to = "variable", values_to = "value")
+dim(long)
+head(long, 3)
+```
+
+```{r}
+monthly <- long |>
+    group_by(Month, variable) |>
+    summarise(mean_value = mean(value, na.rm = TRUE),
+              n = sum(!is.na(value)),
+              .groups = "drop")
+
+monthly |> filter(variable == "Ozone") |> arrange(Month)
+```
+
+同一个结果用基础 R 的 `tapply()` 也能得到，但少了 `n`（每一格有几个有效观测）。**汇总时把 n 一起报出来**：
+
+```{r}
+tapply(airquality$Ozone, airquality$Month, mean, na.rm = TRUE) |> round(1)
+tapply(airquality$Ozone, airquality$Month, function(v) sum(!is.na(v)))
+```
+
+::: {.callout-warning}
+## 有一件事容易被忽略
+5 月只有 26 天、9 月只有 30 天，而 7、8 月各有 31 天；再叠加缺失，每个月的有效观测数并不相同。**均值之间的比较要带着 n 看**。
+:::
+
+`Month` 是数字，直接看表读者记不住。加一张小的对照表，用 `left_join()` 把月份名接上去——这就是第 1 讲的"合并"：
+
+```{r}
+month_lookup <- data.frame(
+    Month = 5:9,
+    month_name = c("May", "June", "July", "August", "September")
+)
+
+monthly2 <- monthly |>
+    left_join(month_lookup, by = "Month") |>
+    mutate(month_name = factor(month_name, levels = month_lookup$month_name))
+
+monthly2 |> filter(variable == "Ozone") |> select(month_name, mean_value, n)
+```
+
+::: {.callout-tip}
+## 练习 2
+1. `long` 有多少行？这个数等于"153 × 4"吗？为什么？
+2. 用 `summarise()` 一次算出每个变量的最大值、最小值与标准差（提示：`across()`）。
+3. 用 `pivot_wider()` 把 `monthly` 变回宽表（每个变量一列），报告它的维度。
+4. 找出缺失最集中的那一个月（只看 `variable == "Ozone"`），说明它会不会影响你对"哪个月空气最差"的判断。
+:::
+
+## 3 自定义函数与 apply 家族
+
+第 1 讲 Part 04 讲了两件事：**重复三次以上的代码就该写成函数**，以及**按行/按列重复计算用 apply 家族而不是 for 循环**。
+
+```{r}
+cv <- function(x, na.rm = TRUE) {
+    sd(x, na.rm = na.rm) / mean(x, na.rm = na.rm)   # 变异系数
+}
+cv(c(10, 20, 30, 40))
+cv(c(1, 2, 3, 4))          # 相对波动相同，CV 相同
+cv(airquality$Ozone)       # 有缺失，靠 na.rm 撑住
+```
+
+```{r}
+num_cols <- airquality[, c("Ozone", "Solar.R", "Wind", "Temp")]
+round(sapply(num_cols, cv), 3)              # 每列算一次 CV → 命名向量
+lapply(num_cols, range)                     # 每列算一次范围 → 列表
+apply(num_cols, 2, median, na.rm = TRUE)    # 2 = 按列
+```
+
+三个函数的区别值得记住：`sapply()` 简化成向量，`lapply()` 永远返回列表，`apply()` 用在矩阵或数据框上、要指定按行（1）还是按列（2）。**不用 for 循环**：遍历和收集结果这两件事交给 R 去做，你只需要写出"每一列要算什么"。
+
+::: {.callout-tip}
+## 练习 3
+1. 写一个函数 `missing_rate()`，返回一列的缺失比例，并用 `sapply()` 算出四列的缺失比例。
+2. 用 `apply()` 算出每一天四个测量值的均值；注意缺失值，说明你为什么这么处理。
+3. 用 `for` 循环实现一次练习 3.1，比较两种写法的代码长度与可读性。
+4. `sapply()` 与 `lapply()` 在同一份数据上返回的对象类型不同，用 `class()` 证明。
+:::
+
+## 4 图形语法：一张图拆成六个部件
+
+第 2 讲 Part 03 的主张是"图不是画出来的，是从数据映射出来的"。骨架永远是：**数据 + 映射 + 几何对象 +（标度 / 坐标系 / 分面）**。
+
+```{r}
+#| fig.width: 7
+#| fig.height: 4.5
+ggplot(airquality, aes(x = Temp, y = Ozone)) +
+    geom_point() +
+    labs(x = "气温（°F）", y = "臭氧（ppb）",
+         title = "气温越高，臭氧越高")
+```
+
+把 `geom_point()` 换成 `geom_smooth()`、`geom_bin2d()`，数据与映射一个字都不用改：
+
+```{r}
+#| fig.width: 12
+#| fig.height: 4
+p1 <- ggplot(airquality, aes(Temp, Ozone)) + geom_point(alpha = .5) + ggtitle("散点：看单个观测")
+p2 <- ggplot(airquality, aes(Temp, Ozone)) + geom_smooth(method = "lm") + ggtitle("拟合：看趋势")
+p3 <- ggplot(airquality, aes(Temp, Ozone)) + geom_bin2d() + ggtitle("二维分箱：看密度")
+
+aplot::plot_list(p1, p2, p3, ncol = 3)
+```
+
+::: {.callout-warning}
+## Month 是整数
+在 `aes(color = Month)` 里直接用它上色，ggplot2 给出的是一条**连续的色带**，而不是五个离散的分组：
+
+```{r}
+#| fig.width: 10
+#| fig.height: 4
+p_bad <- ggplot(airquality, aes(Temp, Ozone, color = Month)) +
+    geom_point() + ggtitle("Month 是整数 → 连续色带") + theme_minimal()
+p_good <- ggplot(airquality, aes(Temp, Ozone, color = factor(Month))) +
+    geom_point() + ggtitle("转成因子 → 五个分组") + theme_minimal()
+
+aplot::plot_list(p_bad, p_good, ncol = 2)
+```
+
+两张图的数据完全一样，**只有颜色那一列的类型不同**。类型是数据的一部分。
+:::
+
+> 另一个容易搞混的点：**映射**（写在 `aes()` 里，跟着数据变化）和**写死一个值**（写在 `aes()` 外面）不是一回事。`aes(color = "blue")` 造出一个叫 `blue` 的分组，`color = "blue"` 把颜色设成蓝色。
+
+::: {.callout-tip}
+## 练习 4
+1. 把 `geom_point()` 换成 `geom_jitter(width = .5, height = 5)`，说明它解决了什么问题。
+2. 用 `aes(size = Wind)` 再加一个通道。同时映射 x、y、color、size 四个变量时，图还能读吗？
+3. 故意写一次 `aes(color = "blue")`，看看图例里出现了什么，再改成 `color = "blue"`。
+4. 用 `scale_color_viridis_d()` 换一套配色，说明"标度"这一层在做什么。
+:::
+
+## 5 四类常用图
+
+第 2 讲 Part 05 挑了四类出镜率最高的图。每一类都在同一份数据上画一次，并且都留一个"该看什么"。
+
+### 5.1 分布图：分组分布 + 原始点
+
+```{r}
+#| fig.width: 9
+#| fig.height: 4.5
+airquality |>
+    mutate(month_name = factor(month.abb[Month], levels = month.abb[5:9])) |>
+    ggplot(aes(month_name, Ozone)) +
+    geom_boxplot(aes(fill = month_name), alpha = .35, width = .6, outlier.shape = NA) +
+    geom_jitter(width = .12, size = 1.3, alpha = .7) +
+    labs(x = NULL, y = "臭氧（ppb）", fill = "月份",
+         title = "臭氧的月度分布：7、8 月最高，离散也最大") +
+    theme_minimal() +
+    theme(legend.position = "none")
+```
+
+**箱线图只画了五个数，原始点把剩下的信息补回来**——7 月的中位数高，同时也夹着几个很低的日子，只画箱子看不到这些。
+
+### 5.2 热图：把 153 天压成一张图
+
+```{r}
+#| fig.width: 11
+#| fig.height: 5
+mat <- as.matrix(airquality[, c("Ozone", "Solar.R", "Wind", "Temp")])
+rownames(mat) <- paste0(airquality$Month, "-", airquality$Day)
+
+# 热图要求没有缺失，月份单独做成注释条
+keep <- complete.cases(mat)
+mat_c <- mat[keep, ]
+anno_col <- data.frame(month = factor(airquality$Month[keep]))
+rownames(anno_col) <- colnames(t(mat_c))   # 注释表的行名必须和矩阵的列名对上
+
+pheatmap(t(mat_c),
+         annotation_col = anno_col,
+         scale = "row",
+         show_colnames = FALSE,
+         clustering_method = "ward.D2",
+         main = "111 天 × 4 个测量值（按行标准化）")
+```
+
+行是四个变量、列是天，横轴的色块条就是月份。**热图的价值是让"结构"一眼可见**：中间那段偏热的日子（7、8 月）在 Temp、Ozone 两行上同时变亮，而 Wind 那一行反过来变暗。
+
+::: {.callout-warning}
+## 热图的三个要点
+1. **`scale = "row"` 改变的是数值**：它把每一行标准化成 z 分数，颜色表示"相对这一行自己"的高低。`scale` 选 `"none"`、`"row"`、`"column"` 得到三张不同的图，报告里写清用的是哪一种。
+2. **行序（列序）来自聚类**：图上相邻的两行是聚类排在一起的。把 `cluster_rows = FALSE` 打开再画一次，可以看到完全不同的排列。
+3. **注释条要和矩阵对齐**：`annotation_col` 的每一行对应矩阵的一列，行名必须与列名一致（上面那句 `rownames(anno_col) <- ...` 就是干这个的）。对不上时 `pheatmap()` 抛出一个和注释颜色有关的费解报错——**遇到看不懂的报错，先检查两个对象的维度与名称**。
+:::
+
+### 5.3 PCA：把四个变量压到两个轴上
+
+第 2 讲那页问的是"处理效应还是供体效应，谁更强"；这里的问题形状一样——**这四个测量值背后主要是几件事？**
+
+```{r}
+#| fig.width: 8
+#| fig.height: 5
+pca <- prcomp(mat_c, scale. = TRUE)
+var_pct <- round(100 * pca$sdev^2 / sum(pca$sdev^2), 1)
+var_pct
+
+pca_df <- data.frame(pca$x[, 1:2],
+                     month = factor(airquality$Month[keep]))
+ggplot(pca_df, aes(PC1, PC2, color = month)) +
+    geom_point(size = 2.5, alpha = .8) +
+    labs(x = paste0("PC1 (", var_pct[1], "%)"),
+         y = paste0("PC2 (", var_pct[2], "%)"),
+         color = "月份",
+         title = "PCA：PC1 主要对应季节") +
+    theme_minimal()
+```
+
+PC1 单独解释了 **59.0%** 的变异，PC2 解释 22.4%。看载荷与相关系数就知道 PC1 是什么：
+
+```{r}
+round(pca$rotation[, 1:2], 2)
+round(cor(mat_c), 2)
+```
+
+温度与臭氧正相关（0.70）、风速与臭氧负相关（−0.61）——PC1 正是"热、静、臭氧高"这一组同步变化。**主成分本身没有含义，能解释它的是载荷与相关矩阵**。
+
+::: {.callout-tip}
+## 练习 5
+1. 用 `scale. = FALSE` 再跑一次 PCA，方差解释比例变成多少？为什么会变这么多？
+2. 把上色变量换成 `factor(cut(Temp, 3))`，PCA 上的结构还清楚吗？
+3. 用 `pheatmap(cor(mat_c))` 画相关矩阵热图，说明它和 PCA 各回答什么问题。
+4. 在 5.1 的图上把 `fill` 换成 `Temp > 80`，比较两种分组的差别。
+:::
+
+### 5.4 组合图：让两个面板共用一个轴
+
+第 2 讲 Part 06 讲"组合图：复杂度在另一个层次"。最常见的组合是**主图 + 边缘分布**：主图看两个变量的关系，边缘图看其中一个变量自己的分布。难点从来不是"拼"，而是**两个面板必须共享同一个坐标轴**。
+
+```{r}
+#| fig.width: 9
+#| fig.height: 6
+main <- ggplot(pca_df, aes(PC1, PC2, color = month)) +
+    geom_point(size = 2.5, alpha = .85) +
+    labs(color = "月份", x = paste0("PC1 (", var_pct[1], "%)"),
+         y = paste0("PC2 (", var_pct[2], "%)")) +
+    theme_minimal() + theme(legend.position = "none")
+
+top <- ggplot(pca_df, aes(PC1, fill = month, color = month)) +
+    geom_density(alpha = .35) +
+    labs(fill = "月份", color = "月份", x = NULL, y = "密度") +
+    theme_minimal() +
+    theme(axis.text.x = element_blank(), axis.title.x = element_blank())
+
+insert_top(main, top, height = .35)
+```
+
+`insert_top()` **自动把两个面板的横轴对齐**：边缘密度图的横轴与主图严格共享 PC1 的取值范围，眼睛可以直接上下对照。
+
+::: {.callout-warning}
+## 对齐的判据
+如果换成 `patchwork` 或 `plot_grid` 各自独立地拼，两个面板各用各的坐标范围，看起来"差不多"但**同一个峰的位置对不上**。判断方法：找主图上最左（或最右）的那个点，看它在边缘密度图里对应的位置是否一致。
+
+组合图的对齐要求，和 5.2 节热图的行序、5.4 上面那句 `rownames(anno_col)` 是同一件事——**把两个对象按同一把尺子摆好，永远比画得好看更重要**。
+:::
+
+::: {.callout-tip}
+## 练习 6
+1. 把 `insert_top()` 换成 `patchwork::wrap_plots(main, top, ncol = 1)`，找主图上最左的点，比较两个面板里它的横坐标位置，说明差别。
+2. 用 `ggsave()` 把上面这张组合图存成 8 × 6 英寸、300 dpi 的 PNG，检查文件大小。
+3. 给 5.1 的图加 `facet_wrap(~ month_name)`，说明分面解决了什么问题、又带来什么新问题。
+4. **换一份数据、同一套语法**：用 ggplot2 自带的 `mpg`，把 `hwy` 按 `class` 分组画一箱一点图，再加 `facet_wrap(~ year)`。只需改数据与列名。
+:::
+
+## 6 交付要求
+
+把上面的练习整理成一份 Quarto 报告：
+
+1. **代码块可见**，每个练习的代码单独一块；
+2. **每个练习后面写结论**，一到两句，写"我算出了什么、怎么判断它对不对"；
+3. **至少两张图在正文里被讨论过**：说清图上哪一部分支持你的结论；
+4. 最后一段 **"我改了哪里"**：列出你改过的参数（`scale`、`cluster_rows`、`geom_*`、主题、阈值），以及改动前后图或数字的变化——**结论要能追溯到参数**。
+
+```{r}
+#| eval: false
+# 一份报告骨架：
+# quarto render report.qmd
+#
+# report.qmd 的 YAML：
+# ---
+# title: "R 语言与数据可视化 · 上机报告"
+# author: "你的名字"
+# format: html
+# ---
+```
+
+## 7 进阶练习：K-means
+
+前面的图都在回答"哪些观测彼此接近"。K-means 换一个问法：**不用任何已知分组，能不能让数据自己站队？** 这正是第 5 讲单细胞聚类的思想雏形——那边换成了 Louvain 社区发现，但"先定分组数、再看结果稳不稳"的麻烦是一样的。
+
+进阶练习在 [kmeans](../kmeans/index.html)（含交互动画，用的是一份新数据），要求：
+
+1. 跑通 `kmeans(iris[, -5], centers = 3)`，和真实物种做交叉表，说明它错在哪一朵花上；
+2. 用肘部法则选 `k`，画出组内平方和随 `k` 的变化曲线；
+3. 把同一批数据先用 PCA 降到 2 维再聚类，比较结果；
+4. 用 `set.seed()` 固定随机种子，重跑三次，说明结果的稳定性。
+
+::: {.callout-note}
+## K-means 与层次聚类
+K-means 是"没有标签时怎么分组"；`hclust` 是"按相似度画一棵树"。上面 5.2 节热图的行序就是层次聚类给出的——把 `cluster_rows` 打开或关掉，看看顺序变了没有。
+:::
