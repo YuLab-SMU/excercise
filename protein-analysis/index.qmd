@@ -48,7 +48,7 @@ library(yulab.utils)
 
 ### 用 rentrez 从 NCBI 下载序列
 
-本节直接从 NCBI 下载这 7 个蛋白的 RefSeq 蛋白序列。给定蛋白的 RefSeq **accession**，用 `rentrez::entrez_fetch()` 获取 FASTA；NCBI 页面：<https://www.ncbi.nlm.nih.gov/protein>。
+本节直接从 NCBI 下载这 7 个蛋白的 RefSeq 蛋白序列。给定蛋白的 RefSeq **accession**，用 `rentrez::entrez_fetch()` 获取 FASTA；NCBI 页面：<https://www.ncbi.nlm.nih.gov/protein>。`id` 接受向量，一次请求就能取回全部记录（返回**一个**拼好的多记录 FASTA 字符串），不必逐条循环。
 
 ```{r}
 pload(rentrez)
@@ -64,11 +64,8 @@ acc <- c(TP53  = "NP_000537.3",
 if (file.exists("proteins_ncbi.fasta")) {
   message("proteins_ncbi.fasta 已存在，跳过 NCBI 下载")
 } else {
-  fa <- vapply(acc, function(a) entrez_fetch(db = "protein", id = a,
-                                             rettype = "fasta"),
-               character(1))
-  stopifnot(!any(nchar(fa) == 0))   # 任一条抓取失败就停下，避免错位
-  cat(fa, sep = "", file = "proteins_ncbi.fasta")
+  fa <- entrez_fetch(db = "protein", id = acc, rettype = "fasta")
+  cat(fa, file = "proteins_ncbi.fasta")
 }
 ```
 
@@ -96,15 +93,15 @@ round(aa[ , apply(aa, 2, function(x) sd(x) > 0)], 2)
 
 ### 分子量与等电点（`Peptides`）
 
-用 `Peptides` 计算分子量与等电点。`pI()` 默认 `pKscale = "EMBOSS"`；与 [ExPASy Compute pI/Mw](https://web.expasy.org/compute_pi/)（Bjellqvist 标度）对照时会差 0.2–0.5。
+用 `Peptides` 计算分子量与等电点。`pI()` 默认 `pKscale = "EMBOSS"`；与 [ExPASy Compute pI/Mw](https://web.expasy.org/compute_pi/)（Bjellqvist 标度）对照时会差 0.2–0.5。`mw()`、`pI()` 都直接吃整个字符向量、返回等长向量，不用逐条循环；但必须先 `as.character()`——把 `AAStringSet` 整个传进去会被当成一条序列，只算出水的质量。
 
 ```{r}
 pload(Peptides)
 res <- data.frame(
   gene = names(seqs),
   length = len,
-  mw  = vapply(as.character(seqs), function(s) mw(s), numeric(1)),
-  pI  = vapply(as.character(seqs), function(s) pI(s), numeric(1))
+  mw  = mw(as.character(seqs)),
+  pI  = pI(as.character(seqs))
 )
 res[, c("mw", "pI")] <- round(res[, c("mw", "pI")], 1)
 res
